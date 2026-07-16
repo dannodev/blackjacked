@@ -8,7 +8,6 @@ import { useStore } from "@/lib/store";
 import type { Meal, MealItem, MealType } from "@/lib/types";
 import { MEAL_LABELS } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Card,
   CardContent,

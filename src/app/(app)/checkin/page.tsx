@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useStore } from "@/lib/store";
 import type { WeightLog } from "@/lib/types";
@@ -18,7 +17,6 @@ import { Camera, Scale } from "lucide-react";
 
 export default function CheckInPage() {
   const profile = useStore((s) => s.profile)!;
-  const weightLogs = useStore((s) => s.weightLogs);
   const addWeightLog = useStore((s) => s.addWeightLog);
 
   const [weight, setWeight] = useState(profile.current_weight_kg);

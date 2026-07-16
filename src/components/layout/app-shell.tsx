@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Plus, BarChart3, User, LogOut, Utensils, ChefHat, Scale } from "lucide-react";
+import { Home, Plus, BarChart3, User, LogOut, Utensils, ChefHat } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/lib/auth";
 import { Wordmark } from "@/components/brand/wordmark";

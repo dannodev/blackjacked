@@ -89,6 +89,7 @@ Food description: "${text}"`;
     return json as AIFoodResult;
   } catch (e) {
     console.warn("Gemini food call failed, using mock", e);
+    void e;
     return mockFoodBreakdown(text);
   }
 }
