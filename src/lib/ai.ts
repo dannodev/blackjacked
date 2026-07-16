@@ -16,7 +16,7 @@ function trackTokens(n: number) {
 async function requestAiJson<T>(
   action: "food" | "menu" | "exercise" | "insight",
   prompt: string,
-): Promise<T> {
+): Promise<{ data: T; model?: string }> {
   const response = await fetch("/api/ai", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -24,6 +24,7 @@ async function requestAiJson<T>(
   });
   const result = (await response.json()) as {
     data?: unknown;
+    model?: string;
     tokens?: number;
     error?: string;
   };
@@ -33,7 +34,7 @@ async function requestAiJson<T>(
   }
 
   if (result.tokens) trackTokens(Math.ceil(result.tokens));
-  return result.data as T;
+  return { data: result.data as T, model: result.model };
 }
 
 /* ============ Types ============ */
@@ -53,6 +54,8 @@ export interface AIFoodResult {
   total_fat_g: number;
   total_carb_g: number;
   summary: string;
+  source?: "gemini" | "fallback";
+  model?: string;
 }
 
 export interface AIMenuDay {
@@ -134,11 +137,15 @@ Food description: "${text}"`;
 
   try {
     const result = await requestAiJson<unknown>("food", prompt);
-    return assertFoodResult(result);
+    return {
+      ...assertFoodResult(result.data),
+      source: "gemini",
+      model: result.model,
+    };
   } catch (e) {
     console.warn("Gemini food call failed, using mock", e);
     void e;
-    return mockFoodBreakdown(text);
+    return { ...mockFoodBreakdown(text), source: "fallback" };
   }
 }
 
@@ -168,7 +175,8 @@ Return ONLY valid JSON (no markdown) matching:
 Reference menu:\n${menuText}`;
 
   try {
-    return await requestAiJson<AIMenuPlan>("menu", prompt);
+    const result = await requestAiJson<AIMenuPlan>("menu", prompt);
+    return result.data;
   } catch (e) {
     console.warn("Gemini menu call failed, using mock", e);
     return mockMenuPlan(menuText, constraints);
@@ -188,7 +196,8 @@ Library: ${JSON.stringify(EXERCISES_FOR_MATCH)}
 Workout: "${text}"`;
 
   try {
-    return await requestAiJson<AIExerciseMatch[]>("exercise", prompt);
+    const result = await requestAiJson<AIExerciseMatch[]>("exercise", prompt);
+    return result.data;
   } catch (e) {
     console.warn("Gemini match failed, using mock", e);
     return mockExerciseMatch(text);
@@ -205,7 +214,8 @@ export async function aiInsight(
 Data: ${ctx}`;
 
   try {
-    return await requestAiJson<AIInsight>("insight", prompt);
+    const result = await requestAiJson<AIInsight>("insight", prompt);
+    return result.data;
   } catch (error) {
     console.warn("Gemini insight call failed, using mock", error);
     return { insight: mockInsight(ctx) };
@@ -320,7 +330,7 @@ function mockMenuPlan(
       est_kcal: c.calorie_goal + (Math.random() * 200 - 100) | 0,
     };
   });
-  return { days, notes: "Mock plan based on your PDF menu. Add GEMINI_API_KEY for AI-generated variety." };
+  return { days, notes: "Backup plan based on your menu. Add GEMINI_API_KEY for AI-generated variety." };
 }
 
 const EXERCISES_FOR_MATCH = [

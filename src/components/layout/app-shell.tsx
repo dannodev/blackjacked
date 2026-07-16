@@ -2,20 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Plus, BarChart3, User, LogOut, Utensils, Dumbbell, Users, Bell } from "lucide-react";
+import { Home, Plus, BarChart3, Utensils, Dumbbell, Users, Bell } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/lib/auth";
+import { useStore } from "@/lib/store";
 import { Wordmark } from "@/components/brand/wordmark";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 
 const nav = [
@@ -24,7 +16,6 @@ const nav = [
   { href: "/stats", label: "Stats", icon: BarChart3 },
   { href: "/squad", label: "Squad", icon: Users },
   { href: "/workouts", label: "Workouts", icon: Dumbbell },
-  { href: "/profile", label: "Profile", icon: User },
 ];
 
 function initials(name: string) {
@@ -33,7 +24,8 @@ function initials(name: string) {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
+  const profile = useStore((s) => s.profile);
   const isLogPage = pathname === "/log" || pathname.startsWith("/log/");
   const hideQuickLog = isLogPage || pathname === "/stats";
 
@@ -51,27 +43,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           >
             <Bell className="size-4" />
           </button>
-          <DropdownMenu>
-            <DropdownMenuTrigger className="rounded-full outline-none">
-              <Avatar className="size-9 border border-white/10 bg-[var(--rosso)]/12 shadow-[0_0_24px_rgba(244,63,63,0.12)]">
+          <Link
+            href="/profile"
+            aria-label="Open profile"
+            className="flex items-center gap-2 rounded-full border border-white/8 bg-white/[0.045] py-1 pl-1 pr-2 transition-colors hover:border-[var(--rosso)]/35 hover:bg-white/[0.07]"
+          >
+            <Avatar className="size-8 border border-white/10 bg-[var(--rosso)]/12 shadow-[0_0_24px_rgba(244,63,63,0.12)]">
+              {profile?.avatar_url && (
+                <AvatarImage src={profile.avatar_url} alt={`${user?.name ?? "User"} profile`} />
+              )}
                 <AvatarFallback className="bg-transparent text-sm font-bold text-[var(--rosso-light)]">
                   {user ? initials(user.name) : "??"}
                 </AvatarFallback>
               </Avatar>
-            </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuGroup>
-              <DropdownMenuLabel className="truncate">
-                {user?.email}
-              </DropdownMenuLabel>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => signOut()} className="text-[var(--over)]">
-              <LogOut className="mr-2 size-4" />
-              Log out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-          </DropdownMenu>
+            <span className="max-w-20 truncate text-xs font-semibold text-muted-foreground">
+              {user?.name ?? "Profile"}
+            </span>
+          </Link>
         </div>
       </header>
 

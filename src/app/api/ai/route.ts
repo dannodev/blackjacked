@@ -6,7 +6,7 @@ import {
 } from "@google/generative-ai";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-const MODEL = "gemini-3.5-flash";
+const MODELS = ["gemini-3.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-flash"] as const;
 const MAX_PROMPT_CHARS = 12_000;
 const AI_ACTIONS = ["food", "menu", "exercise", "insight"] as const;
 
@@ -111,29 +111,38 @@ export async function POST(request: Request) {
 
   try {
     const client = new GoogleGenerativeAI(key);
-    const model = client.getGenerativeModel({
-      model: MODEL,
-      generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema: responseSchemaFor(body.action),
-      },
-    });
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
-    let data: unknown;
-    try {
-      data = JSON.parse(text);
-    } catch {
-      return NextResponse.json(
-        { error: "Gemini returned invalid JSON." },
-        { status: 502 },
-      );
+    let lastError = "Gemini request failed.";
+
+    for (const modelName of MODELS) {
+      try {
+        const model = client.getGenerativeModel({
+          model: modelName,
+          generationConfig: {
+            responseMimeType: "application/json",
+            responseSchema: responseSchemaFor(body.action),
+          },
+        });
+        const result = await model.generateContent(prompt);
+        const text = result.response.text();
+        let data: unknown;
+        try {
+          data = JSON.parse(text);
+        } catch {
+          lastError = `${modelName} returned invalid JSON.`;
+          continue;
+        }
+
+        return NextResponse.json({
+          data,
+          model: modelName,
+          tokens: result.response.usageMetadata?.totalTokenCount ?? 0,
+        });
+      } catch (error) {
+        lastError = error instanceof Error ? error.message : lastError;
+      }
     }
 
-    return NextResponse.json({
-      data,
-      tokens: result.response.usageMetadata?.totalTokenCount ?? 0,
-    });
+    return NextResponse.json({ error: lastError }, { status: 502 });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Gemini request failed.";

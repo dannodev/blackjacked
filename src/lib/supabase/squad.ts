@@ -11,6 +11,9 @@ const SQUAD_COLORS = [
   "#a855f7",
   "#ec4899",
 ] as const;
+const E2E_AUTH_KEY = "blackjacked.e2eAuth";
+const E2E_SQUAD_KEY = "blackjacked.e2eSquad";
+const E2E_USER_ID = "00000000-0000-4000-8000-000000000001";
 
 export type SquadRow = {
   id: string;
@@ -65,6 +68,56 @@ export type PublicActivityInput = {
   mealsCount: number;
   streaks: Streaks;
 };
+
+function e2eSnapshot(): SquadSnapshot {
+  return {
+    squad: {
+      id: "00000000-0000-4000-8000-0000000000aa",
+      owner_id: "00000000-0000-4000-8000-0000000000bb",
+      name: "Test Squad",
+      invite_code: "BLACK1",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    members: [
+      {
+        squad_id: "00000000-0000-4000-8000-0000000000aa",
+        user_id: E2E_USER_ID,
+        display_name: "E2E Racer",
+        color: SQUAD_COLORS[0],
+        role: "member",
+        joined_at: new Date().toISOString(),
+      },
+    ],
+    activity: [],
+    messages: [],
+  };
+}
+
+function canUseE2EAuthBypass() {
+  const search = typeof window !== "undefined" ? window.location.search : "";
+  const isLocalhost =
+    typeof window !== "undefined" &&
+    ["localhost", "127.0.0.1"].includes(window.location.hostname);
+  return (
+    typeof window !== "undefined" &&
+    isLocalhost &&
+    (localStorage.getItem(E2E_AUTH_KEY) === "1" ||
+      search.includes("__e2eAuth=1"))
+  );
+}
+
+function getE2eSquad(): SquadSnapshot | null {
+  if (!canUseE2EAuthBypass() || typeof window === "undefined") return null;
+  const raw = localStorage.getItem(E2E_SQUAD_KEY);
+  return raw ? (JSON.parse(raw) as SquadSnapshot) : null;
+}
+
+function setE2eSquad(snapshot: SquadSnapshot | null) {
+  if (!canUseE2EAuthBypass() || typeof window === "undefined") return;
+  if (snapshot) localStorage.setItem(E2E_SQUAD_KEY, JSON.stringify(snapshot));
+  else localStorage.removeItem(E2E_SQUAD_KEY);
+}
 
 function requireSupabase() {
   if (!isSupabaseConfigured()) {
@@ -124,6 +177,8 @@ async function loadSquadById(squadId: string): Promise<SquadSnapshot> {
 }
 
 export async function loadMySquad(): Promise<SquadSnapshot | null> {
+  if (canUseE2EAuthBypass()) return getE2eSquad();
+
   const supabase = requireSupabase();
   const userId = await getCurrentUserId();
 
@@ -142,6 +197,16 @@ export async function loadMySquad(): Promise<SquadSnapshot | null> {
 }
 
 export async function createRemoteSquad(name: string, displayName: string) {
+  if (canUseE2EAuthBypass()) {
+    const snapshot = e2eSnapshot();
+    snapshot.squad.name = name;
+    snapshot.squad.owner_id = E2E_USER_ID;
+    snapshot.members[0].display_name = displayName;
+    snapshot.members[0].role = "owner";
+    setE2eSquad(snapshot);
+    return snapshot;
+  }
+
   const supabase = requireSupabase();
   const userId = await getCurrentUserId();
   const squadId = crypto.randomUUID();
@@ -168,17 +233,48 @@ export async function createRemoteSquad(name: string, displayName: string) {
 }
 
 export async function joinRemoteSquad(inviteCode: string, displayName: string) {
+  if (canUseE2EAuthBypass()) {
+    if (inviteCode.trim().toUpperCase() !== "BLACK1") {
+      throw new Error("Invalid squad code");
+    }
+    const snapshot = e2eSnapshot();
+    snapshot.members[0].display_name = displayName;
+    setE2eSquad(snapshot);
+    return snapshot;
+  }
+
   const supabase = requireSupabase();
-  const { data, error } = await supabase.rpc("join_squad_by_code", {
-    invite_code_input: inviteCode,
-    display_name_input: displayName,
+  const userId = await getCurrentUserId();
+  const cleanCode = inviteCode.trim().toUpperCase();
+  const { data: squad, error: squadError } = await supabase
+    .from("squads")
+    .select("id")
+    .eq("invite_code", cleanCode)
+    .maybeSingle();
+
+  if (squadError) throw squadError;
+  if (!squad?.id) throw new Error("Invalid squad code");
+
+  const colorIndex = crypto.getRandomValues(new Uint8Array(1))[0] % SQUAD_COLORS.length;
+  const { error: memberError } = await supabase.from("squad_members").insert({
+    squad_id: squad.id,
+    user_id: userId,
+    display_name: displayName.trim() || "Racer",
+    color: SQUAD_COLORS[colorIndex],
+    role: "member",
   });
 
-  if (error) throw error;
-  return loadSquadById(data as string);
+  if (memberError) throw memberError;
+  return loadSquadById(squad.id);
 }
 
 export async function leaveRemoteSquad(squadId: string) {
+  if (canUseE2EAuthBypass()) {
+    void squadId;
+    setE2eSquad(null);
+    return;
+  }
+
   const supabase = requireSupabase();
   const userId = await getCurrentUserId();
   const { error } = await supabase
@@ -194,6 +290,26 @@ export async function syncMySquadActivity(
   squadId: string,
   activity: PublicActivityInput,
 ) {
+  if (canUseE2EAuthBypass()) {
+    const snapshot = getE2eSquad();
+    if (!snapshot) return;
+    snapshot.activity = [
+      {
+        squad_id: squadId,
+        user_id: E2E_USER_ID,
+        date: activity.date,
+        kcal_in: Math.round(activity.kcalIn),
+        kcal_out_activity: Math.round(activity.kcalOutActivity),
+        workouts_count: activity.workoutsCount,
+        meals_count: activity.mealsCount,
+        streak: activity.streaks.current_streak,
+        updated_at: new Date().toISOString(),
+      },
+    ];
+    setE2eSquad(snapshot);
+    return;
+  }
+
   const supabase = requireSupabase();
   const userId = await getCurrentUserId();
   const { error } = await supabase.from("squad_activity").upsert(
@@ -215,6 +331,20 @@ export async function syncMySquadActivity(
 }
 
 export async function sendSquadMessage(squadId: string, body: string) {
+  if (canUseE2EAuthBypass()) {
+    const snapshot = getE2eSquad();
+    if (!snapshot) return;
+    snapshot.messages.push({
+      id: crypto.randomUUID(),
+      squad_id: squadId,
+      user_id: E2E_USER_ID,
+      body,
+      created_at: new Date().toISOString(),
+    });
+    setE2eSquad(snapshot);
+    return;
+  }
+
   const supabase = requireSupabase();
   const userId = await getCurrentUserId();
   const { error } = await supabase.from("squad_messages").insert({
@@ -230,6 +360,12 @@ export function subscribeToSquad(
   squadId: string,
   onChange: () => void,
 ) {
+  if (canUseE2EAuthBypass()) {
+    void squadId;
+    void onChange;
+    return () => undefined;
+  }
+
   const supabase = requireSupabase();
   const channel = supabase
     .channel(`squad:${squadId}`)

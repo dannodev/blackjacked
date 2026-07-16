@@ -14,6 +14,8 @@ export interface MenuMealPreset {
   emoji: string;
 }
 
+export type MenuMealOption = MenuMealPreset;
+
 export const MENU_MEAL_PRESETS: MenuMealPreset[] = [
   // Monday
   {
@@ -401,16 +403,17 @@ export function getTodayMeals(): MenuMealPreset[] {
 export function getCurrentMealOptions(
   schedule?: MealSchedule,
   at = new Date(),
+  meals = MENU_MEAL_PRESETS,
 ): {
   label: string;
   time: string;
-  options: MenuMealPreset[];
+  options: MenuMealOption[];
 } {
   const active = getActiveMealWindow(schedule, at);
   return {
     label: active.label,
     time: active.time,
-    options: MENU_MEAL_PRESETS.filter((meal) => meal.meal_slot === active.slot),
+    options: meals.filter((meal) => meal.meal_slot === active.slot),
   };
 }
 

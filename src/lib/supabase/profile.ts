@@ -19,11 +19,13 @@ type ProfileRow = {
   dinner_time: string | null;
   am_snack_time: string | null;
   pm_snack_time: string | null;
+  avatar_url: string | null;
+  avatar_public_id: string | null;
   created_at: string;
 };
 
 const PROFILE_COLUMNS =
-  "id, sex, birthdate, height_cm, current_weight_kg, activity_factor, calorie_goal, protein_goal, fat_goal, carb_goal, breakfast_time, lunch_time, dinner_time, am_snack_time, pm_snack_time, created_at";
+  "id, sex, birthdate, height_cm, current_weight_kg, activity_factor, calorie_goal, protein_goal, fat_goal, carb_goal, breakfast_time, lunch_time, dinner_time, am_snack_time, pm_snack_time, avatar_url, avatar_public_id, created_at";
 
 function normalizeTime(value?: string | null) {
   if (!value) return null;
@@ -52,6 +54,8 @@ function fromRow(row: ProfileRow): Profile {
       am_snack_time: normalizeTime(row.am_snack_time),
       pm_snack_time: normalizeTime(row.pm_snack_time),
     },
+    avatar_url: row.avatar_url ?? undefined,
+    avatar_public_id: row.avatar_public_id ?? undefined,
     createdAt: row.created_at,
   };
 }
@@ -83,6 +87,8 @@ function toRow(userId: string, profile: Profile): Omit<ProfileRow, "created_at">
     pm_snack_time: hasMealSchedule(profile.meal_schedule ?? {})
       ? normalizeTime(profile.meal_schedule?.pm_snack_time)
       : null,
+    avatar_url: profile.avatar_url ?? null,
+    avatar_public_id: profile.avatar_public_id ?? null,
   };
 }
 

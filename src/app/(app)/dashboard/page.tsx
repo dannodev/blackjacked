@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
@@ -7,7 +8,12 @@ import { useTodayData, sortToday } from "@/lib/use-today-data";
 import { useCloudMeals } from "@/lib/use-cloud-meals";
 import { useCloudExerciseLogs } from "@/lib/use-cloud-exercise-logs";
 import { computeDay, MEAL_LABELS, type Meal } from "@/lib/types";
-import { getCurrentMealOptions, getNextMealToLog } from "@/lib/menu-meals";
+import {
+  getCurrentMealOptions,
+  getNextMealToLog,
+  MENU_MEAL_PRESETS,
+  type MenuMealOption,
+} from "@/lib/menu-meals";
 import { makeId } from "@/lib/id";
 import { DeficitRing } from "@/components/deficit-ring";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,6 +21,14 @@ import { Flame, Dumbbell, Droplets, Moon, TrendingUp, Play, Utensils, Sparkles, 
 import Link from "next/link";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 const stagger = {
   hidden: {},
@@ -33,8 +47,11 @@ export default function DashboardPage() {
   const sleepToday = useStore((s) => s.sleepToday);
   const setWater = useStore((s) => s.setWater);
   const setSleep = useStore((s) => s.setSleep);
+  const customMenuMeals = useStore((s) => s.customMenuMeals);
+  const useDefaultMenu = useStore((s) => s.useDefaultMenu);
   const { addMeal, deleteMeal } = useCloudMeals();
   const { deleteExerciseLog } = useCloudExerciseLogs();
+  const [selectedMenuMeal, setSelectedMenuMeal] = useState<MenuMealOption | null>(null);
   const { meals, exerciseLogs } = useTodayData();
   const day = computeDay(meals, exerciseLogs, profile);
 
@@ -43,37 +60,50 @@ export default function DashboardPage() {
 
   const firstName = user?.name?.split(" ")[0] ?? "Athlete";
 
+  const menuMeals = [
+    ...(useDefaultMenu ? MENU_MEAL_PRESETS : []),
+    ...customMenuMeals,
+  ];
   const recommendation = getNextMealToLog(
     day.remaining_vs_goal,
     profile.meal_schedule,
   );
-  const currentMealOptions = getCurrentMealOptions(profile.meal_schedule);
+  const currentMealOptions = getCurrentMealOptions(
+    profile.meal_schedule,
+    new Date(),
+    menuMeals,
+  );
   const loggedMealNames = new Set(meals.flatMap((m) => m.items.map((i) => i.name)));
+
+  async function logMenuMeal(menuMeal: MenuMealOption) {
+    await addMeal({
+      id: makeId(),
+      type: menuMeal.type,
+      loggedAt: new Date().toISOString(),
+      total_kcal: menuMeal.kcal,
+      p: menuMeal.protein_g,
+      f: menuMeal.fat_g,
+      c: menuMeal.carb_g,
+      items: [{
+        food_item_id: menuMeal.id,
+        name: menuMeal.name,
+        quantity: 1,
+        unit: "serving",
+        kcal: menuMeal.kcal,
+        protein_g: menuMeal.protein_g,
+        fat_g: menuMeal.fat_g,
+        carb_g: menuMeal.carb_g,
+      }],
+    });
+    toast.success(`${menuMeal.name} logged`, {
+      description: `${menuMeal.kcal} kcal added`,
+    });
+    setSelectedMenuMeal(null);
+  }
 
   async function quickLogRecommendation() {
     if (!recommendation) return;
-    await addMeal({
-      id: makeId(),
-      type: recommendation.type,
-      loggedAt: new Date().toISOString(),
-      total_kcal: recommendation.kcal,
-      p: recommendation.protein_g,
-      f: recommendation.fat_g,
-      c: recommendation.carb_g,
-      items: [{
-        food_item_id: recommendation.id,
-        name: recommendation.name,
-        quantity: 1,
-        unit: "serving",
-        kcal: recommendation.kcal,
-        protein_g: recommendation.protein_g,
-        fat_g: recommendation.fat_g,
-        carb_g: recommendation.carb_g,
-      }],
-    });
-    toast.success(`${recommendation.name} logged`, {
-      description: `${recommendation.kcal} kcal added`,
-    });
+    await logMenuMeal(recommendation);
   }
 
   return (
@@ -221,19 +251,20 @@ export default function DashboardPage() {
             </p>
           </div>
           <Link
-            href="/log?type=food"
+            href="/log"
             className="text-xs font-semibold text-[var(--rosso-light)] hover:underline"
           >
-            Log from menu
+            Your Menu
           </Link>
         </div>
         <div className="flex gap-2 overflow-x-auto pb-1">
           {currentMealOptions.options.map((m) => {
             const isLogged = loggedMealNames.has(m.name);
             return (
-              <Link
+              <button
                 key={m.id}
-                href="/log?type=food"
+                type="button"
+                onClick={() => setSelectedMenuMeal(m)}
                 className={`flex w-30 shrink-0 flex-col gap-1 rounded-[1.25rem] border p-3 transition-all ${
                   isLogged
                     ? "border-[var(--rosso)]/30 bg-[var(--rosso)]/10"
@@ -244,11 +275,55 @@ export default function DashboardPage() {
                 <p className="text-[11px] font-semibold leading-tight">{m.name}</p>
                 <p className="text-[10px] text-muted-foreground">{m.kcal} kcal</p>
                 {isLogged && <Check className="size-3 text-[var(--rosso-light)]" />}
-              </Link>
+              </button>
             );
           })}
+          {currentMealOptions.options.length === 0 && (
+            <Link
+              href="/menu"
+              className="flex min-h-24 w-full items-center justify-center rounded-[1.25rem] border border-dashed border-white/10 bg-white/[0.035] px-4 text-center text-xs text-muted-foreground"
+            >
+              No meals for this time yet. Add meals to Your Menu.
+            </Link>
+          )}
         </div>
       </motion.div>
+
+      <Dialog
+        open={Boolean(selectedMenuMeal)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedMenuMeal(null);
+        }}
+      >
+        <DialogContent className="rounded-[1.6rem] border-white/10 bg-[#111]">
+          {selectedMenuMeal && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{selectedMenuMeal.name}</DialogTitle>
+                <DialogDescription>
+                  {selectedMenuMeal.meal_slot} · {selectedMenuMeal.kcal} kcal
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3">
+                <p className="rounded-2xl border border-white/7 bg-white/[0.045] p-3 text-sm">
+                  {selectedMenuMeal.description}
+                </p>
+                <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                  <MacroBox label="Protein" value={`${selectedMenuMeal.protein_g}g`} />
+                  <MacroBox label="Carbs" value={`${selectedMenuMeal.carb_g}g`} />
+                  <MacroBox label="Fat" value={`${selectedMenuMeal.fat_g}g`} />
+                </div>
+                <Button
+                  className="w-full bg-[var(--rosso)] text-white hover:bg-[var(--rosso)]/90"
+                  onClick={() => void logMenuMeal(selectedMenuMeal)}
+                >
+                  Log this meal
+                </Button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* next workout teaser */}
       <motion.div variants={item}>
@@ -342,17 +417,17 @@ export default function DashboardPage() {
         <div className="mb-2 flex items-center justify-between">
           <h2 className="font-heading text-sm font-bold">My meals</h2>
           <Link
-            href="/log?type=food"
+            href="/log"
             className="text-xs font-semibold text-[var(--rosso-light)] hover:underline"
           >
-            View meal plan
+            Your Menu
           </Link>
         </div>
         {sortedMeals.length === 0 ? (
           <EmptyCard
             icon={<Utensils className="size-5" />}
             text="No meals logged yet. Tap a menu recommendation to fill the ring."
-            cta={{ href: "/log?type=food", label: "Log a meal" }}
+            cta={{ href: "/log", label: "Log a meal" }}
           />
         ) : (
           <div className="space-y-2">
@@ -499,6 +574,19 @@ function MealRow({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function MacroBox({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-white/7 bg-white/[0.045] px-2 py-3">
+      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      <p className="font-heading text-sm font-bold text-[var(--rosso-light)]">
+        {value}
+      </p>
+    </div>
   );
 }
 

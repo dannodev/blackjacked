@@ -34,71 +34,29 @@ function inferMealType(): MealType {
   return "dinner";
 }
 
-type SubTab = "menu" | "search" | "custom";
-const MENU_DAYS = ["All", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-
-export function FoodLog() {
-  const [subtab, setSubtab] = useState<SubTab>("menu");
-
-  return (
-    <div className="space-y-4">
-      <div className="flex gap-1.5 rounded-full border border-white/8 bg-black/35 p-1">
-        <SubTabBtn active={subtab === "menu"} onClick={() => setSubtab("menu")} icon={<Utensils className="size-3.5" />}>
-          Menu PDF
-        </SubTabBtn>
-        <SubTabBtn active={subtab === "search"} onClick={() => setSubtab("search")}>
-          Search Foods
-        </SubTabBtn>
-      </div>
-
-      {subtab === "menu" && <MenuMealsLog />}
-      {subtab === "search" && <SearchFoodsLog />}
-    </div>
-  );
-}
-
-function SubTabBtn({
-  active,
-  onClick,
-  children,
-  icon,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-  icon?: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "flex flex-1 items-center justify-center gap-1.5 rounded-full py-2 text-xs font-semibold transition-all",
-        active
-          ? "bg-white text-black shadow-sm"
-          : "text-muted-foreground hover:text-foreground",
-      )}
-    >
-      {icon}
-      {children}
-    </button>
-  );
+export function FoodLog({ mode = "menu" }: { mode?: "menu" | "search" }) {
+  return mode === "menu" ? <MenuMealsLog /> : <SearchFoodsLog />;
 }
 
 /* ============ Menu Meals (from PDF) ============ */
 function MenuMealsLog() {
   const { addMeal } = useCloudMeals();
   const profile = useStore((s) => s.profile)!;
+  const customMenuMeals = useStore((s) => s.customMenuMeals);
+  const useDefaultMenu = useStore((s) => s.useDefaultMenu);
   const [logged, setLogged] = useState<Set<string>>(new Set());
-  const [dayFilter, setDayFilter] = useState("All");
   const [mealFilter, setMealFilter] = useState<MealType | "all">("all");
 
+  const allMenuMeals = useMemo(
+    () => [...(useDefaultMenu ? MENU_MEAL_PRESETS : []), ...customMenuMeals],
+    [customMenuMeals, useDefaultMenu],
+  );
+
   const menuMeals = useMemo(() => {
-    return MENU_MEAL_PRESETS.filter((meal) => {
-      const matchesDay = dayFilter === "All" || meal.day === dayFilter;
-      const matchesMeal = mealFilter === "all" || meal.type === mealFilter;
-      return matchesDay && matchesMeal;
-    });
-  }, [dayFilter, mealFilter]);
+    return allMenuMeals.filter(
+      (meal) => mealFilter === "all" || meal.type === mealFilter,
+    );
+  }, [allMenuMeals, mealFilter]);
 
   async function logPreset(preset: MenuMealPreset) {
     const meal: Meal = {
@@ -129,7 +87,7 @@ function MenuMealsLog() {
     });
   }
 
-  if (MENU_MEAL_PRESETS.length === 0) {
+  if (allMenuMeals.length === 0) {
     return (
       <Card className="rounded-[1.6rem] border-dashed border-white/10 bg-white/[0.035]">
         <CardContent className="flex flex-col items-center gap-3 py-8 text-center">
@@ -137,7 +95,8 @@ function MenuMealsLog() {
             <Utensils className="size-6" />
           </div>
           <p className="max-w-xs text-sm text-muted-foreground">
-            No meals mapped from your weekly PDF yet. Use the Search tab for now.
+            Your menu is empty. Restore the default menu or add custom meals in
+            the Menu page.
           </p>
         </CardContent>
       </Card>
@@ -148,28 +107,11 @@ function MenuMealsLog() {
     <div className="space-y-2">
       <div className="mb-1 flex items-center justify-between">
         <p className="text-xs uppercase tracking-wide text-muted-foreground">
-          {dayFilter === "All" ? "All PDF meals" : dayFilter}
+          Your Menu
         </p>
         <p className="text-xs text-muted-foreground">
           Goal: {profile.calorie_goal} kcal
         </p>
-      </div>
-      <div className="flex gap-1.5 overflow-x-auto pb-1">
-        {MENU_DAYS.map((day) => (
-          <button
-            key={day}
-            type="button"
-            onClick={() => setDayFilter(day)}
-            className={cn(
-              "shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
-              dayFilter === day
-                ? "border-[var(--rosso)] bg-[var(--rosso)]/12 text-[var(--rosso-light)]"
-                : "border-white/10 text-muted-foreground",
-            )}
-          >
-            {day}
-          </button>
-        ))}
       </div>
       <div className="grid grid-cols-5 gap-1.5">
         {(["all", ...MEAL_TYPES] as const).map((mealType) => (
@@ -384,11 +326,11 @@ function SearchFoodsLog() {
             <Plus className="size-4 text-[var(--rosso-light)]" />
           </button>
         ))}
-        {results.length === 0 && (
-          <p className="py-6 text-center text-sm text-muted-foreground">
-            No foods found. Try another search or use the AI food tab.
-          </p>
-        )}
+          {results.length === 0 && (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+            No foods found. Try another search or use AI Macros.
+            </p>
+          )}
       </div>
 
       {cart.length > 0 && (

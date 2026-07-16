@@ -37,6 +37,59 @@ type AuthContextValue = AuthState & {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 const LAST_USER_KEY = "blackjacked.lastUserId";
+const E2E_AUTH_KEY = "blackjacked.e2eAuth";
+const E2E_NO_AUTH_KEY = "blackjacked.e2eNoAuth";
+const E2E_USER: AppUser = {
+  id: "00000000-0000-4000-8000-000000000001",
+  email: "e2e@blackjacked.test",
+  name: "E2E Racer",
+  createdAt: "2026-07-16T00:00:00.000Z",
+};
+const E2E_PROFILE = {
+  sex: "male" as const,
+  birthdate: "1995-01-15",
+  height_cm: 180,
+  current_weight_kg: 80,
+  activity_factor: 1.55 as const,
+  calorie_goal: 1900,
+  protein_goal: 130,
+  fat_goal: 60,
+  carb_goal: 200,
+  createdAt: "2026-07-16T00:00:00.000Z",
+  meal_schedule: {
+    breakfast_time: "08:00",
+    am_snack_time: "11:00",
+    lunch_time: "13:30",
+    pm_snack_time: "17:00",
+    dinner_time: "20:00",
+  },
+};
+
+function canUseE2EAuthBypass() {
+  const search = typeof window !== "undefined" ? window.location.search : "";
+  const isLocalhost =
+    typeof window !== "undefined" &&
+    ["localhost", "127.0.0.1"].includes(window.location.hostname);
+  return (
+    typeof window !== "undefined" &&
+    isLocalhost &&
+    (localStorage.getItem(E2E_AUTH_KEY) === "1" ||
+      search.includes("__e2eAuth=1"))
+  );
+}
+
+function shouldDisableE2EAuth() {
+  const search = typeof window !== "undefined" ? window.location.search : "";
+  const isLocalhost =
+    typeof window !== "undefined" &&
+    ["localhost", "127.0.0.1"].includes(window.location.hostname);
+  return (
+    typeof window !== "undefined" &&
+    isLocalhost &&
+    (localStorage.getItem(E2E_NO_AUTH_KEY) === "1" ||
+      search.includes("__e2eNoAuth=1"))
+  );
+}
 
 /** Extract AppUser from Supabase user metadata. */
 export function supabaseToAppUser(u: SupabaseUser): AppUser {
@@ -51,8 +104,11 @@ export function supabaseToAppUser(u: SupabaseUser): AppUser {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const useSupabase = isSupabaseConfigured();
-  const [user, setUser] = useState<AppUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const initialE2EUser =
+    canUseE2EAuthBypass() && !shouldDisableE2EAuth() ? E2E_USER : null;
+  const initialE2ENoAuth = canUseE2EAuthBypass() && shouldDisableE2EAuth();
+  const [user, setUser] = useState<AppUser | null>(initialE2EUser);
+  const [loading, setLoading] = useState(!initialE2EUser && !initialE2ENoAuth);
 
   const applySupabaseUser = useCallback((nextUser: SupabaseUser | null) => {
     if (!nextUser) {
@@ -71,6 +127,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // ── Init ──────────────────────────────────────────────
   useEffect(() => {
+    if (canUseE2EAuthBypass()) {
+      if (shouldDisableE2EAuth()) {
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
+      localStorage.setItem(E2E_AUTH_KEY, "1");
+      localStorage.setItem(LAST_USER_KEY, E2E_USER.id);
+      if (!useStore.getState().profile) {
+        useStore.getState().setProfile(E2E_PROFILE);
+      }
+      setUser(E2E_USER);
+      setLoading(false);
+      return;
+    }
+
     if (useSupabase) {
       // Supabase mode: check current session
       const supabase = getSupabaseBrowser();
@@ -94,7 +167,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // ── Sign in ───────────────────────────────────────────
   const signIn = useCallback(
     async (email: string, password: string) => {
-      if (useSupabase) {
+      if (canUseE2EAuthBypass()) {
+        localStorage.setItem(LAST_USER_KEY, E2E_USER.id);
+        setUser(E2E_USER);
+      } else if (useSupabase) {
         const supabase = getSupabaseBrowser();
         const { error } = await supabase.auth.signInWithPassword({
           email,
@@ -148,7 +224,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // ── Sign out ─────────────────────────────────────────
   const signOut = useCallback(async () => {
-    if (useSupabase) {
+    if (canUseE2EAuthBypass()) {
+      setUser(null);
+    } else if (useSupabase) {
       const supabase = getSupabaseBrowser();
       await supabase.auth.signOut();
     } else {

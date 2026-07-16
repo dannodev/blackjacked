@@ -18,6 +18,7 @@ import type {
 import { todayKey } from "./types";
 import { FOODS } from "./foods-seed";
 import { makeId } from "./id";
+import type { MenuMealPreset } from "./menu-meals";
 
 const DB_KEY = "blackjacked-store-v1";
 
@@ -26,7 +27,14 @@ export const SEED_FOODS: FoodItem[] = FOODS;
 const idbStorage = {
   getItem: async (name: string): Promise<string | null> => {
     const v = await idbGet(name);
-    return v ?? null;
+    if (typeof v !== "string" || !v.trim()) return null;
+    try {
+      JSON.parse(v);
+      return v;
+    } catch {
+      await idbDel(name);
+      return null;
+    }
   },
   setItem: async (name: string, value: string): Promise<void> => {
     await idbSet(name, value);
@@ -44,6 +52,8 @@ interface State {
   weightLogs: WeightLog[];
   recipes: Recipe[];
   customFoods: FoodItem[];
+  customMenuMeals: MenuMealPreset[];
+  useDefaultMenu: boolean;
   streaks: Streaks;
   waterToday: number;
   sleepToday: number;
@@ -61,6 +71,9 @@ interface State {
   setWeightLogs: (logs: WeightLog[]) => void;
   addWeightLog: (w: WeightLog) => void;
   addCustomFood: (f: FoodItem) => void;
+  addCustomMenuMeal: (meal: MenuMealPreset) => void;
+  deleteCustomMenuMeal: (id: string) => void;
+  setUseDefaultMenu: (enabled: boolean) => void;
   addRecipe: (r: Recipe) => void;
   deleteRecipe: (id: string) => void;
   setWater: (ml: number) => void;
@@ -90,6 +103,8 @@ export const useStore = create<State>()(
       weightLogs: [],
       recipes: [],
       customFoods: [],
+      customMenuMeals: [],
+      useDefaultMenu: true,
       streaks: emptyStreaks(),
       waterToday: 0,
       sleepToday: 0,
@@ -155,6 +170,14 @@ export const useStore = create<State>()(
 
       addCustomFood: (f) =>
         set((s) => ({ customFoods: [...s.customFoods, f] })),
+
+      addCustomMenuMeal: (meal) =>
+        set((s) => ({ customMenuMeals: [...s.customMenuMeals, meal] })),
+      deleteCustomMenuMeal: (id) =>
+        set((s) => ({
+          customMenuMeals: s.customMenuMeals.filter((meal) => meal.id !== id),
+        })),
+      setUseDefaultMenu: (enabled) => set({ useDefaultMenu: enabled }),
 
       addRecipe: (r) => set((s) => ({ recipes: [...s.recipes, r] })),
       deleteRecipe: (id) =>
@@ -241,6 +264,8 @@ export const useStore = create<State>()(
           weightLogs: [],
           recipes: [],
           customFoods: [],
+          customMenuMeals: [],
+          useDefaultMenu: true,
           streaks: emptyStreaks(),
           waterToday: 0,
           sleepToday: 0,

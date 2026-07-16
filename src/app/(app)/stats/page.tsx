@@ -1,19 +1,8 @@
 "use client";
 
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import { useMemo } from "react";
-import {
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-  Line,
-  ComposedChart,
-  Bar,
-} from "recharts";
 import { useStore } from "@/lib/store";
 import { computeDay, dateKey } from "@/lib/types";
 import {
@@ -23,6 +12,16 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Scale, TrendingDown } from "lucide-react";
+
+const WeightTrendChart = dynamic(
+  () => import("./stats-charts").then((mod) => mod.WeightTrendChart),
+  { ssr: false, loading: () => <ChartSkeleton height="h-[200px]" /> },
+);
+
+const DeficitChart = dynamic(
+  () => import("./stats-charts").then((mod) => mod.DeficitChart),
+  { ssr: false, loading: () => <ChartSkeleton height="h-[220px]" /> },
+);
 
 export default function StatsPage() {
   const profile = useStore((s) => s.profile)!;
@@ -47,6 +46,23 @@ export default function StatsPage() {
 
   // last 7 days deficit data
   const deficitData = useMemo(() => {
+    const mealsByDate = new Map<string, typeof meals>();
+    const exerciseByDate = new Map<string, typeof exerciseLogs>();
+
+    for (const meal of meals) {
+      const key = meal.loggedAt.slice(0, 10);
+      const current = mealsByDate.get(key);
+      if (current) current.push(meal);
+      else mealsByDate.set(key, [meal]);
+    }
+
+    for (const exercise of exerciseLogs) {
+      const key = exercise.loggedAt.slice(0, 10);
+      const current = exerciseByDate.get(key);
+      if (current) current.push(exercise);
+      else exerciseByDate.set(key, [exercise]);
+    }
+
     const days: {
       date: string;
       label: string;
@@ -58,8 +74,8 @@ export default function StatsPage() {
       const d = new Date();
       d.setDate(d.getDate() - i);
       const key = dateKey(d);
-      const dayMeals = meals.filter((m) => m.loggedAt.slice(0, 10) === key);
-      const dayEx = exerciseLogs.filter((e) => e.loggedAt.slice(0, 10) === key);
+      const dayMeals = mealsByDate.get(key) ?? [];
+      const dayEx = exerciseByDate.get(key) ?? [];
       const day = computeDay(dayMeals, dayEx, profile, d);
       days.push({
         date: key,
@@ -112,34 +128,7 @@ export default function StatsPage() {
           {weightData.length === 0 ? (
             <EmptyChart text="Log a check-in to see your trend" />
           ) : (
-            <ResponsiveContainer width="100%" height={200}>
-              <AreaChart data={weightData}>
-                <defs>
-                  <linearGradient id="weightGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--rosso)" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="var(--rosso)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                <XAxis dataKey="date" stroke="var(--muted-foreground)" fontSize={11} />
-                <YAxis stroke="var(--muted-foreground)" fontSize={11} domain={["auto", "auto"]} />
-                <Tooltip
-                  contentStyle={{
-                    background: "var(--panel-soft)",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    borderRadius: 18,
-                    fontSize: 12,
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="weight"
-                  stroke="var(--rosso)"
-                  strokeWidth={2}
-                  fill="url(#weightGrad)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            <WeightTrendChart data={weightData} />
           )}
         </CardContent>
       </Card>
@@ -153,45 +142,7 @@ export default function StatsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="py-2">
-          <ResponsiveContainer width="100%" height={220}>
-            <ComposedChart data={deficitData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-              <XAxis dataKey="label" stroke="var(--muted-foreground)" fontSize={11} />
-              <YAxis stroke="var(--muted-foreground)" fontSize={11} />
-              <Tooltip
-                contentStyle={{
-                  background: "var(--panel-soft)",
-                  border: "1px solid rgba(255,255,255,0.1)",
-                  borderRadius: 18,
-                  fontSize: 12,
-                }}
-              />
-              <Bar
-                dataKey="goal_deficit"
-                fill="var(--rosso)"
-                radius={[8, 8, 0, 0]}
-                opacity={0.6}
-                name="Goal deficit"
-              />
-              <Line
-                type="monotone"
-                dataKey="real_deficit"
-                stroke="var(--amber)"
-                strokeWidth={2}
-                dot={{ fill: "var(--amber)", r: 3 }}
-                name="Real deficit"
-              />
-              <Line
-                type="monotone"
-                dataKey="kcal_in"
-                stroke="var(--over)"
-                strokeWidth={1.5}
-                strokeDasharray="4 4"
-                dot={false}
-                name="kcal in"
-              />
-            </ComposedChart>
-          </ResponsiveContainer>
+          <DeficitChart data={deficitData} />
           <div className="mt-3 flex gap-4 text-xs">
             <Legend color="var(--rosso)" label="Goal deficit (bar)" />
             <Legend color="var(--amber)" label="Real deficit (line)" />
@@ -235,6 +186,14 @@ export default function StatsPage() {
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function ChartSkeleton({ height }: { height: string }) {
+  return (
+    <div className={`flex ${height} items-center justify-center rounded-2xl bg-white/[0.035]`}>
+      <p className="text-sm text-muted-foreground">Loading chart...</p>
     </div>
   );
 }

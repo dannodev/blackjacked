@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   protein_goal    int  NOT NULL DEFAULT 0,
   fat_goal        int  NOT NULL DEFAULT 0,
   carb_goal       int  NOT NULL DEFAULT 0,
+  avatar_url      text,
+  avatar_public_id text,
   created_at      timestamptz NOT NULL DEFAULT now()
 );
 

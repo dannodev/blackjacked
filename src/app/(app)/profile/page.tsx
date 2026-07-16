@@ -11,8 +11,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ACTIVITY_OPTIONS, type MealSchedule } from "@/lib/types";
-import { Bolt, Bell, BellOff, Clock3, Users } from "lucide-react";
+import { Bolt, Bell, BellOff, Camera, Clock3, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -40,6 +41,81 @@ function normalizeSchedule(schedule?: MealSchedule) {
   };
 }
 
+function initials(name?: string) {
+  return (name ?? "??").slice(0, 2).toUpperCase();
+}
+
+async function compressAvatar(file: File): Promise<Blob> {
+  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(image);
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Could not read that image."));
+    };
+
+    image.src = objectUrl;
+  });
+
+  const maxSize = 512;
+  const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
+  const width = Math.max(1, Math.round(image.width * scale));
+  const height = Math.max(1, Math.round(image.height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+
+  if (!context) throw new Error("Could not prepare that image.");
+  context.drawImage(image, 0, 0, width, height);
+
+  const blob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob(resolve, "image/jpeg", 0.78),
+  );
+
+  if (!blob) throw new Error("Image compression failed.");
+  return blob;
+}
+
+async function uploadAvatar(blob: Blob) {
+  const formData = new FormData();
+  formData.append("file", blob, `avatar-${Date.now()}.jpg`);
+
+  const response = await fetch("/api/profile-avatar", {
+    method: "POST",
+    body: formData,
+  });
+  const result = (await response.json()) as {
+    avatar_url?: string;
+    avatar_public_id?: string;
+    error?: string;
+  };
+
+  if (!response.ok || !result.avatar_url || !result.avatar_public_id) {
+    throw new Error(result.error ?? "Could not upload profile picture.");
+  }
+
+  return {
+    avatar_url: result.avatar_url,
+    avatar_public_id: result.avatar_public_id,
+  };
+}
+
+async function deleteAvatar() {
+  const response = await fetch("/api/profile-avatar", { method: "DELETE" });
+  const result = (await response.json()) as { error?: string };
+
+  if (!response.ok) {
+    throw new Error(result.error ?? "Could not remove profile picture.");
+  }
+}
+
 export default function ProfilePage() {
   const { user, signOut } = useAuth();
   const profile = useStore((s) => s.profile)!;
@@ -52,6 +128,7 @@ export default function ProfilePage() {
   const [mealTimes, setMealTimes] = useState(() =>
     normalizeSchedule(profile.meal_schedule),
   );
+  const [savingAvatar, setSavingAvatar] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem("blackjacked.reminders");
@@ -118,18 +195,99 @@ export default function ProfilePage() {
     router.replace("/onboarding");
   }
 
+  async function handleAvatarFile(file?: File) {
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Choose an image file");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Profile picture must be under 5 MB");
+      return;
+    }
+
+    try {
+      setSavingAvatar(true);
+      const compressed = await compressAvatar(file);
+      const avatar = await uploadAvatar(compressed);
+      updateProfile(avatar);
+      toast.success("Profile picture updated");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not update picture");
+    } finally {
+      setSavingAvatar(false);
+    }
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3">
-        <div className="flex size-14 items-center justify-center rounded-2xl bg-[var(--rosso)]/12 font-heading text-xl font-extrabold text-[var(--rosso-light)]">
-          {user?.name.slice(0, 2).toUpperCase()}
+        <div className="relative">
+          <Avatar className="size-16 rounded-2xl border border-white/10 bg-[var(--rosso)]/12">
+            {profile.avatar_url && (
+              <AvatarImage
+                src={profile.avatar_url}
+                alt={`${user?.name ?? "User"} profile picture`}
+                className="rounded-2xl"
+              />
+            )}
+            <AvatarFallback className="rounded-2xl bg-transparent font-heading text-xl font-extrabold text-[var(--rosso-light)]">
+              {initials(user?.name)}
+            </AvatarFallback>
+          </Avatar>
+          <label
+            htmlFor="profile-picture"
+            className="absolute -bottom-1 -right-1 flex size-8 cursor-pointer items-center justify-center rounded-full border border-white/10 bg-[var(--rosso)] text-white shadow-lg transition-transform hover:scale-105"
+            aria-label="Change profile picture"
+          >
+            <Camera className="size-4" />
+          </label>
+          <Input
+            id="profile-picture"
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="sr-only"
+            disabled={savingAvatar}
+            onChange={(event) => {
+              void handleAvatarFile(event.target.files?.[0]);
+              event.currentTarget.value = "";
+            }}
+          />
         </div>
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--rosso-light)]">Profile</p>
           <h1 className="font-heading text-2xl font-extrabold">{user?.name}</h1>
           <p className="text-sm font-medium text-muted-foreground">{user?.email}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {savingAvatar ? "Saving picture..." : "Tap the camera to change your picture"}
+          </p>
         </div>
       </div>
+
+      {profile.avatar_url && (
+        <Button
+          variant="outline"
+          className="w-full"
+          disabled={savingAvatar}
+          onClick={async () => {
+            try {
+              setSavingAvatar(true);
+              await deleteAvatar();
+              updateProfile({ avatar_url: undefined, avatar_public_id: undefined });
+              toast.success("Profile picture removed");
+            } catch (error) {
+              toast.error(error instanceof Error ? error.message : "Could not remove picture");
+            } finally {
+              setSavingAvatar(false);
+            }
+          }}
+        >
+          <Trash2 className="mr-2 size-4" />
+          Remove profile picture
+        </Button>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         <Stat label="Day streak" value={`${streaks.current_streak}`} accent />

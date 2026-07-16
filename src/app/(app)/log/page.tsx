@@ -6,12 +6,12 @@ import { FoodLog } from "@/components/log/food-log";
 import { AiFoodLog } from "@/components/log/ai-food-log";
 import { useSearchParams } from "next/navigation";
 
-type Tab = "food" | "ai";
+type Tab = "menu" | "ai" | "search";
 
 export default function LogPage() {
   const params = useSearchParams();
   const requested = params.get("type");
-  const initial = requested === "ai" ? "ai" : "food";
+  const initial = requested === "ai" ? "ai" : requested === "search" ? "search" : "menu";
   const [tab, setTab] = useState<Tab>(initial);
 
   return (
@@ -22,16 +22,20 @@ export default function LogPage() {
       </div>
       <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
         <TabsList className="w-full">
-          <TabsTrigger value="food" className="flex-1">
-            Food
+          <TabsTrigger value="menu" className="flex-1">
+            Your Menu
           </TabsTrigger>
           <TabsTrigger value="ai" className="flex-1">
-            AI food
+            AI Macros
+          </TabsTrigger>
+          <TabsTrigger value="search" className="flex-1">
+            Search Food
           </TabsTrigger>
         </TabsList>
         <div className="mt-4">
-          {tab === "food" && <FoodLog />}
+          {tab === "menu" && <FoodLog mode="menu" />}
           {tab === "ai" && <AiFoodLog />}
+          {tab === "search" && <FoodLog mode="search" />}
         </div>
       </Tabs>
     </div>

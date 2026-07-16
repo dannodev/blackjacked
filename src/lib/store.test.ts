@@ -86,6 +86,8 @@ describe("useStore", () => {
       weightLogs: [],
       recipes: [],
       customFoods: [],
+      customMenuMeals: [],
+      useDefaultMenu: true,
       streaks: { current_streak: 0, longest_streak: 0, last_logged_date: null },
       waterToday: 0,
       sleepToday: 0,

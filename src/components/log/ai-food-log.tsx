@@ -143,6 +143,11 @@ export function AiFoodLog() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
+                <p className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-muted-foreground">
+                  {result.source === "gemini"
+                    ? `Gemini estimate${result.model ? ` · ${result.model}` : ""}`
+                    : "Backup estimate · Gemini was unavailable"}
+                </p>
                 {result.ingredients.map((ing, i) => (
                   <div
                     key={i}

@@ -40,6 +40,8 @@ export interface Profile {
   carb_goal: number;
   createdAt: string;
   meal_schedule?: MealSchedule;
+  avatar_url?: string;
+  avatar_public_id?: string;
 }
 
 export interface FoodItem {
