@@ -54,7 +54,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               {user?.email}
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={signOut} className="text-[var(--over)]">
+            <DropdownMenuItem onClick={() => signOut()} className="text-[var(--over)]">
               <LogOut className="mr-2 size-4" />
               Log out
             </DropdownMenuItem>

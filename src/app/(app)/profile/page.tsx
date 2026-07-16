@@ -159,8 +159,8 @@ export default function ProfilePage() {
         <Button
           variant="ghost"
           className="w-full"
-          onClick={() => {
-            signOut();
+          onClick={async () => {
+            await signOut();
             router.replace("/login");
           }}
         >

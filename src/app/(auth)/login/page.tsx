@@ -42,8 +42,8 @@ export default function LoginPage() {
       await signIn(values.email, values.password);
       toast.success("Welcome back");
       router.replace("/dashboard");
-    } catch {
-      toast.error("Something went wrong");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Authentication failed");
     }
   };
 

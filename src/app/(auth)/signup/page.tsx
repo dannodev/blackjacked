@@ -43,8 +43,8 @@ export default function SignupPage() {
       await signUp(values.name, values.email, values.password);
       toast.success("Account created");
       router.replace("/onboarding");
-    } catch {
-      toast.error("Something went wrong");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Sign up failed");
     }
   };
 
