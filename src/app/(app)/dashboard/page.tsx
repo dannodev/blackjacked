@@ -6,17 +6,17 @@ import { useStore } from "@/lib/store";
 import { useTodayData, sortToday } from "@/lib/use-today-data";
 import { useCloudMeals } from "@/lib/use-cloud-meals";
 import { useCloudExerciseLogs } from "@/lib/use-cloud-exercise-logs";
-import { computeDay, MEAL_LABELS, type Meal } from "@/lib/types";
+import { computeDay, dateKey, exerciseKcal, MEAL_LABELS, type Exercise, type Meal } from "@/lib/types";
 import {
   getCurrentMealOptions,
-  getNextMealToLog,
   MENU_MEAL_PRESETS,
   type MenuMealOption,
 } from "@/lib/menu-meals";
+import { CATEGORY_LABELS, EXERCISES } from "@/lib/exercises-seed";
 import { makeId } from "@/lib/id";
 import { DeficitRing } from "@/components/deficit-ring";
 import { Card, CardContent } from "@/components/ui/card";
-import { Flame, Dumbbell, Droplets, Moon, TrendingUp, Play, Utensils, Sparkles, Check, Trash2 } from "lucide-react";
+import { Flame, Droplets, Moon, TrendingUp, Utensils, Check, Trash2, Star } from "lucide-react";
 import Link from "next/link";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { toast } from "sonner";
@@ -28,6 +28,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { saveSupabaseDailySummary } from "@/lib/supabase/daily-summary";
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -37,16 +38,17 @@ export default function DashboardPage() {
   const sleepToday = useStore((s) => s.sleepToday);
   const setWater = useStore((s) => s.setWater);
   const setSleep = useStore((s) => s.setSleep);
+  const upsertDailySummary = useStore((s) => s.upsertDailySummary);
   const customMenuMeals = useStore((s) => s.customMenuMeals);
   const useDefaultMenu = useStore((s) => s.useDefaultMenu);
+  const favoriteExerciseIds = useStore((s) => s.favoriteExerciseIds);
   const { addMeal, deleteMeal } = useCloudMeals();
-  const { deleteExerciseLog } = useCloudExerciseLogs();
+  const { addExerciseLog } = useCloudExerciseLogs();
   const [selectedMenuMeal, setSelectedMenuMeal] = useState<MenuMealOption | null>(null);
   const { meals, exerciseLogs } = useTodayData();
   const day = computeDay(meals, exerciseLogs, profile);
 
   const sortedMeals = sortToday(meals) as Meal[];
-  const sortedEx = sortToday(exerciseLogs);
 
   const firstName = user?.name?.split(" ")[0] ?? "Athlete";
 
@@ -54,16 +56,15 @@ export default function DashboardPage() {
     ...(useDefaultMenu ? MENU_MEAL_PRESETS : []),
     ...customMenuMeals,
   ];
-  const recommendation = getNextMealToLog(
-    day.remaining_vs_goal,
-    profile.meal_schedule,
-  );
   const currentMealOptions = getCurrentMealOptions(
     profile.meal_schedule,
     new Date(),
     menuMeals,
   );
   const loggedMealNames = new Set(meals.flatMap((m) => m.items.map((i) => i.name)));
+  const favoriteExercises = favoriteExerciseIds
+    .map((id) => EXERCISES.find((exercise) => exercise.id === id))
+    .filter((exercise): exercise is Exercise => Boolean(exercise));
 
   async function logMenuMeal(menuMeal: MenuMealOption) {
     await addMeal({
@@ -91,9 +92,66 @@ export default function DashboardPage() {
     setSelectedMenuMeal(null);
   }
 
-  async function quickLogRecommendation() {
-    if (!recommendation) return;
-    await logMenuMeal(recommendation);
+  async function quickLogExercise(exercise: Exercise) {
+    const isStrength =
+      exercise.category === "gym" ||
+      exercise.category === "core" ||
+      exercise.category === "calisthenics";
+    const duration = 30;
+    const kcal = exerciseKcal(exercise, profile.current_weight_kg, duration);
+
+    await addExerciseLog({
+      id: makeId(),
+      exercise_id: exercise.id,
+      exercise_name: exercise.name,
+      category: exercise.category,
+      mets: exercise.mets,
+      duration_min: duration,
+      sets: isStrength ? 3 : undefined,
+      reps: isStrength ? 10 : undefined,
+      kcal_burned: kcal,
+      loggedAt: new Date().toISOString(),
+    });
+    toast.success(`${exercise.name} logged`, {
+      description: `~${Math.round(kcal)} kcal burned`,
+    });
+  }
+
+  async function saveWellness(nextWater: number, nextSleep: number) {
+    const date = dateKey(new Date());
+    const summary = {
+      date,
+      kcal_in: day.kcal_in,
+      kcal_out_activity: day.kcal_out_activity,
+      bmr_kcal: day.bmr_kcal,
+      tdee_kcal: day.tdee_kcal,
+      deficit_kcal: day.goal_deficit,
+      real_deficit_kcal: day.real_deficit,
+      water_ml: nextWater,
+      sleep_hours: nextSleep,
+      notes: undefined,
+    };
+    upsertDailySummary(summary);
+    if (user) {
+      try {
+        await saveSupabaseDailySummary(user.id, summary);
+      } catch {
+        toast.info("Saved locally", {
+          description: "Wellness sync will catch up when Supabase is available.",
+        });
+      }
+    }
+  }
+
+  function updateWater(nextWater: number) {
+    const safeWater = Math.max(0, nextWater);
+    setWater(safeWater);
+    void saveWellness(safeWater, sleepToday);
+  }
+
+  function updateSleep(nextSleep: number) {
+    setSleep(nextSleep);
+    void saveWellness(waterToday, nextSleep);
   }
 
   return (
@@ -191,38 +249,6 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* today's recommendation */}
-      {recommendation && !loggedMealNames.has(recommendation.name) && (
-        <div className="dashboard-item">
-          <div className="mb-2 flex items-center gap-2">
-            <Sparkles className="size-4 text-[var(--rosso-light)]" />
-            <h2 className="font-heading text-sm font-bold">Recommended next meal</h2>
-          </div>
-          <Card className="carbon-card overflow-hidden rounded-[1.35rem] border-[var(--rosso)]/20">
-            <CardContent className="flex items-center gap-3 py-3.5">
-              <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-white/[0.055] text-2xl">
-                {recommendation.emoji}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-bold">{recommendation.name}</p>
-                <p className="truncate text-xs text-muted-foreground">{recommendation.description}</p>
-                <p className="mt-0.5 text-xs">
-                  <span className="font-bold text-[var(--rosso-light)]">{recommendation.kcal} kcal</span>
-                  <span className="text-muted-foreground"> · P{recommendation.protein_g}g C{recommendation.carb_g}g F{recommendation.fat_g}g</span>
-                </p>
-              </div>
-              <button
-                onClick={quickLogRecommendation}
-                className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--rosso)] text-white rosso-glow transition-transform active:scale-90"
-                aria-label="Log recommended meal"
-              >
-                <Check className="size-5" strokeWidth={2.5} />
-              </button>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
       {/* current meal options */}
       <div className="dashboard-item">
         <div className="mb-2 flex items-center justify-between">
@@ -309,6 +335,39 @@ export default function DashboardPage() {
         </DialogContent>
       </Dialog>
 
+      {/* recent meals */}
+      <div className="dashboard-item">
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="font-heading text-sm font-bold">My meals</h2>
+          <Link
+            href="/log"
+            className="text-xs font-semibold text-[var(--rosso-light)] hover:underline"
+          >
+            Your Menu
+          </Link>
+        </div>
+        {sortedMeals.length === 0 ? (
+          <EmptyCard
+            icon={<Utensils className="size-5" />}
+            text="No meals logged yet. Tap a meal option above to fill the ring."
+            cta={{ href: "/log", label: "Log a meal" }}
+          />
+        ) : (
+          <div className="space-y-2">
+            {sortedMeals.map((m) => (
+              <MealRow
+                key={m.id}
+                meal={m}
+                onDelete={async () => {
+                  await deleteMeal(m.id);
+                  toast.success("Meal removed");
+                }}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* next workout teaser */}
       <div className="dashboard-item">
         <div className="mb-2 flex items-center justify-between">
@@ -317,33 +376,57 @@ export default function DashboardPage() {
             href="/workouts"
             className="text-xs font-semibold text-[var(--rosso-light)] hover:underline"
           >
-            View all
+            Star exercises
           </Link>
         </div>
-        <Card className="carbon-card relative overflow-hidden rounded-[1.5rem] border-white/7">
-          <CardContent className="flex items-center justify-between py-4">
-            <div>
-              <div className="mb-1 flex items-center gap-2">
-                <Flame className="size-4 text-[var(--rosso-light)]" />
-                <span className="text-xs text-muted-foreground">
-                  {sortedEx[0]?.kcal_burned ?? 200} kcal burn
-                </span>
+        {favoriteExercises.length === 0 ? (
+          <Card className="rounded-[1.5rem] border-dashed border-white/10 bg-white/[0.035]">
+            <CardContent className="flex items-center gap-3 py-4">
+              <div className="flex size-11 items-center justify-center rounded-2xl bg-[var(--amber)]/12 text-[var(--amber)]">
+                <Star className="size-5" />
               </div>
-              <h3 className="text-base font-bold">
-                {sortedEx[0]?.exercise_name ?? "Upper Strength"}
-              </h3>
-              <span className="mt-1 inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[11px] capitalize">
-                {sortedEx[0]?.category ?? "Circuit"}
-              </span>
-            </div>
-            <Link
-              href="/workouts"
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--rosso)] text-white rosso-glow"
-            >
-              <Play className="ml-0.5 size-5 fill-current" />
-            </Link>
-          </CardContent>
-        </Card>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold">No favorite workouts yet</p>
+                <p className="text-xs text-muted-foreground">
+                  Star exercises in Workouts and they will show up here.
+                </p>
+              </div>
+              <Link
+                href="/workouts"
+                className="rounded-full bg-[var(--rosso)] px-3 py-2 text-xs font-semibold text-white"
+              >
+                Add
+              </Link>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {favoriteExercises.map((exercise) => (
+              <button
+                key={exercise.id}
+                type="button"
+                onClick={() => void quickLogExercise(exercise)}
+                className="flex w-40 shrink-0 flex-col gap-2 rounded-[1.35rem] border border-[var(--amber)]/25 bg-[var(--amber)]/10 p-3 text-left transition-colors hover:bg-[var(--amber)]/15"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <Star className="size-4 fill-[var(--amber)] text-[var(--amber)]" />
+                  <span className="rounded-full bg-black/30 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                    Log
+                  </span>
+                </div>
+                <div>
+                  <p className="line-clamp-2 text-sm font-bold leading-tight">
+                    {exercise.name}
+                  </p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    {CATEGORY_LABELS[exercise.category]} · ~
+                    {Math.round(exerciseKcal(exercise, profile.current_weight_kg, 30))} kcal
+                  </p>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* hydration + sleep */}
@@ -358,12 +441,18 @@ export default function DashboardPage() {
               {(waterToday / 1000).toFixed(1)}
               <span className="text-xs text-muted-foreground">L</span>
             </p>
-            <div className="mt-1.5 flex gap-1">
+            <div className="mt-1.5 grid grid-cols-2 gap-1">
+              <button
+                onClick={() => updateWater(waterToday - 250)}
+                className="rounded-full bg-white/[0.055] py-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:bg-[var(--over)]/10 hover:text-[var(--over)]"
+              >
+                -250ml
+              </button>
               {[250, 500, 1000].map((ml) => (
                 <button
                   key={ml}
-                  onClick={() => setWater(waterToday + ml)}
-                  className="flex-1 rounded-full bg-white/[0.055] py-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:bg-[var(--rosso)]/10 hover:text-[var(--rosso-light)]"
+                  onClick={() => updateWater(waterToday + ml)}
+                  className="rounded-full bg-white/[0.055] py-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:bg-[var(--rosso)]/10 hover:text-[var(--rosso-light)]"
                 >
                   +{ml >= 1000 ? "1L" : `${ml}ml`}
                 </button>
@@ -385,7 +474,7 @@ export default function DashboardPage() {
               {[6, 7, 8].map((h) => (
                 <button
                   key={h}
-                  onClick={() => setSleep(h)}
+                  onClick={() => updateSleep(h)}
                   className="flex-1 rounded-full bg-white/[0.055] py-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:bg-[var(--rosso)]/10 hover:text-[var(--rosso-light)]"
                 >
                   {h}h
@@ -394,97 +483,6 @@ export default function DashboardPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
-
-      {/* recent meals */}
-      <div className="dashboard-item">
-        <div className="mb-2 flex items-center justify-between">
-          <h2 className="font-heading text-sm font-bold">My meals</h2>
-          <Link
-            href="/log"
-            className="text-xs font-semibold text-[var(--rosso-light)] hover:underline"
-          >
-            Your Menu
-          </Link>
-        </div>
-        {sortedMeals.length === 0 ? (
-          <EmptyCard
-            icon={<Utensils className="size-5" />}
-            text="No meals logged yet. Tap a menu recommendation to fill the ring."
-            cta={{ href: "/log", label: "Log a meal" }}
-          />
-        ) : (
-          <div className="space-y-2">
-            {sortedMeals.map((m) => (
-              <MealRow
-                key={m.id}
-                meal={m}
-                onDelete={async () => {
-                  await deleteMeal(m.id);
-                  toast.success("Meal removed");
-                }}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* recent workouts */}
-      <div className="dashboard-item">
-        <div className="mb-2 mt-4 flex items-center justify-between">
-          <h2 className="font-heading text-sm font-bold">Workouts</h2>
-          <Link
-            href="/workouts"
-            className="text-xs font-semibold text-[var(--rosso-light)] hover:underline"
-          >
-            Add
-          </Link>
-        </div>
-        {sortedEx.length === 0 ? (
-          <EmptyCard
-            icon={<Dumbbell className="size-5" />}
-            text="No workouts yet. Log a run or lift to add to your burn."
-            cta={{ href: "/workouts", label: "Log a workout" }}
-          />
-        ) : (
-          <div className="space-y-2">
-            {sortedEx.map((e) => (
-              <Card key={e.id} className="carbon-card rounded-[1.35rem] border-white/7">
-                <CardContent className="flex items-center justify-between gap-3 py-3.5">
-                  <div className="flex items-center gap-3">
-                    <div className="flex size-10 items-center justify-center rounded-2xl bg-[var(--rosso)]/12 text-[var(--rosso-light)]">
-                      <Dumbbell className="size-5" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">{e.exercise_name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {e.duration_min} min
-                        {e.distance_km ? ` · ${e.distance_km} km` : ""}
-                        {e.sets ? ` · ${e.sets}×${e.reps} reps` : ""}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <span className="font-bold text-[var(--rosso-light)]">
-                      -{Math.round(e.kcal_burned)}
-                    </span>
-                    <button
-                      type="button"
-                      aria-label={`Delete ${e.exercise_name}`}
-                      className="flex size-8 items-center justify-center rounded-full border border-white/10 text-muted-foreground transition-colors hover:border-[var(--over)]/40 hover:text-[var(--over)]"
-                      onClick={async () => {
-                        await deleteExerciseLog(e.id);
-                        toast.success("Workout removed");
-                      }}
-                    >
-                      <Trash2 className="size-4" />
-                    </button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );

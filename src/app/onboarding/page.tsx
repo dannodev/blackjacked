@@ -43,6 +43,9 @@ const goalSchema = z.object({
   protein_goal: z.coerce.number().min(0),
   fat_goal: z.coerce.number().min(0),
   carb_goal: z.coerce.number().min(0),
+  goal_mode: z.enum(["lose", "gain", "maintain"]),
+  goal_target_weight_kg: z.coerce.number().min(35).max(300).optional(),
+  goal_target_date: z.string().optional(),
   breakfast_time: z.string().optional(),
   lunch_time: z.string().optional(),
   dinner_time: z.string().optional(),
@@ -74,6 +77,7 @@ export default function OnboardingPage() {
   const watchProtein = goalForm.watch("protein_goal");
   const watchFat = goalForm.watch("fat_goal");
   const watchCarb = goalForm.watch("carb_goal");
+  const watchGoalMode = goalForm.watch("goal_mode");
   const suggestion = useMemo(() => {
     if (!watchBasics?.height_cm || !watchBasics?.current_weight_kg || !watchBasics?.birthdate)
       return null;
@@ -114,6 +118,7 @@ export default function OnboardingPage() {
     basicsForm.clearErrors();
     setStep(1);
     goalForm.setValue("activity_factor", 1.55);
+    goalForm.setValue("goal_mode", "lose");
   };
 
   const onActivityNext = () => {
@@ -138,6 +143,14 @@ export default function OnboardingPage() {
       protein_goal: values.protein_goal,
       fat_goal: values.fat_goal,
       carb_goal: values.carb_goal,
+      goal_mode: values.goal_mode,
+      goal_start_weight_kg: b.current_weight_kg,
+      goal_target_weight_kg:
+        values.goal_mode === "maintain"
+          ? b.current_weight_kg
+          : values.goal_target_weight_kg,
+      goal_start_date: new Date().toISOString().slice(0, 10),
+      goal_target_date: values.goal_target_date || undefined,
       meal_schedule: {
         breakfast_time: values.breakfast_time || null,
         lunch_time: values.lunch_time || null,
@@ -350,6 +363,67 @@ export default function OnboardingPage() {
                     kcal/day at a ~450 deficit.
                   </div>
                 )}
+                <div className="space-y-2">
+                  <Label>Body goal</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(["lose", "maintain", "gain"] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => {
+                          goalForm.setValue("goal_mode", mode, { shouldDirty: true });
+                          if (mode === "maintain" && watchBasics.current_weight_kg) {
+                            goalForm.setValue(
+                              "goal_target_weight_kg",
+                              watchBasics.current_weight_kg,
+                              { shouldDirty: true },
+                            );
+                          }
+                        }}
+                        className={cn(
+                          "rounded-full border px-2 py-2 text-xs font-semibold capitalize transition-colors",
+                          watchGoalMode === mode
+                            ? "border-[var(--rosso)] bg-[var(--rosso)]/12 text-[var(--rosso-light)]"
+                            : "border-white/10 text-muted-foreground",
+                        )}
+                      >
+                        {mode}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    We keep progress history. Squad only sees progress, not your weight.
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="goal_target_weight_kg">
+                      Target weight (kg)
+                    </Label>
+                    <Input
+                      id="goal_target_weight_kg"
+                      type="number"
+                      step="0.1"
+                      disabled={watchGoalMode === "maintain"}
+                      placeholder={
+                        watchGoalMode === "gain"
+                          ? "85"
+                          : watchGoalMode === "maintain"
+                            ? `${watchBasics.current_weight_kg ?? ""}`
+                            : "70"
+                      }
+                      {...goalForm.register("goal_target_weight_kg")}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="goal_target_date">Target date</Label>
+                    <Input
+                      id="goal_target_date"
+                      type="date"
+                      {...goalForm.register("goal_target_date")}
+                    />
+                  </div>
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="calorie_goal">Calorie goal (kcal/day)</Label>
                   <Input

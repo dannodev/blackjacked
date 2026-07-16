@@ -1,8 +1,9 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Plus, BarChart3, Utensils, Dumbbell, Users, Bell } from "lucide-react";
+import { Home, BarChart3, Utensils, Dumbbell, Users, Bell, ClipboardList, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
 import { Wordmark } from "@/components/brand/wordmark";
@@ -11,6 +12,7 @@ import { cn } from "@/lib/utils";
 
 const nav = [
   { href: "/dashboard", label: "Today", icon: Home },
+  { href: "/log", label: "Log", icon: ClipboardList },
   { href: "/menu", label: "Menu", icon: Utensils },
   { href: "/stats", label: "Stats", icon: BarChart3 },
   { href: "/squad", label: "Squad", icon: Users },
@@ -25,8 +27,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user } = useAuth();
   const profile = useStore((s) => s.profile);
-  const isLogPage = pathname === "/log" || pathname.startsWith("/log/");
-  const hideQuickLog = isLogPage || pathname === "/stats";
+  const waterToday = useStore((s) => s.waterToday);
+  const sleepToday = useStore((s) => s.sleepToday);
+  const meals = useStore((s) => s.meals);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const notificationItems = useMemo(
+    () => buildNotifications(waterToday, sleepToday, meals.length),
+    [meals.length, sleepToday, waterToday],
+  );
 
   return (
     <div className="app-glow mx-auto flex min-h-[100dvh] max-w-md flex-col overflow-hidden bg-background shadow-[0_0_80px_rgba(0,0,0,0.55)] sm:border-x sm:border-white/8">
@@ -36,12 +44,51 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Wordmark size="text-lg" />
         </Link>
         <div className="flex items-center gap-2">
-          <button
-            aria-label="Notifications"
-            className="flex size-9 items-center justify-center rounded-full border border-white/8 bg-white/[0.045] text-muted-foreground"
-          >
-            <Bell className="size-4" />
-          </button>
+          <div className="relative">
+            <button
+              aria-label="Notifications"
+              aria-expanded={notificationsOpen}
+              className="relative flex size-9 items-center justify-center rounded-full border border-white/8 bg-white/[0.045] text-muted-foreground transition-colors hover:border-[var(--rosso)]/35 hover:text-foreground"
+              onClick={() => setNotificationsOpen((open) => !open)}
+            >
+              <Bell className="size-4" />
+              {notificationItems.length > 0 && (
+                <span className="absolute right-1 top-1 size-2 rounded-full bg-[var(--rosso)]" />
+              )}
+            </button>
+            {notificationsOpen && (
+              <div className="absolute right-0 top-11 z-50 w-72 rounded-[1.35rem] border border-white/10 bg-[#101013] p-3 shadow-[0_22px_60px_rgba(0,0,0,0.55)]">
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="font-heading text-sm font-bold">Today reminders</p>
+                  <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] text-muted-foreground">
+                    {notificationItems.length || "clear"}
+                  </span>
+                </div>
+                {notificationItems.length === 0 ? (
+                  <div className="flex items-center gap-2 rounded-2xl bg-white/[0.04] p-3 text-sm text-muted-foreground">
+                    <CheckCircle2 className="size-4 text-[var(--aqua)]" />
+                    You are caught up for now.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {notificationItems.map((item) => (
+                      <Link
+                        key={item.href + item.title}
+                        href={item.href}
+                        onClick={() => setNotificationsOpen(false)}
+                        className="block rounded-2xl border border-white/7 bg-white/[0.04] p-3 transition-colors hover:bg-white/[0.07]"
+                      >
+                        <p className="text-sm font-bold">{item.title}</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {item.description}
+                        </p>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
           <Link
             href="/profile"
             aria-label="Open profile"
@@ -64,24 +111,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Page content */}
       <main className="flex-1 px-4 pb-28 pt-4">{children}</main>
-
-      {/* Log FAB */}
-      {!hideQuickLog && (
-        <div className="pointer-events-none fixed inset-x-0 bottom-[4.8rem] z-40 mx-auto flex max-w-md justify-end pr-5">
-          <Link
-            href="/log"
-            className="group pointer-events-auto flex w-fit items-center"
-            aria-label="Quick log"
-          >
-            <span
-              className="flex h-14 w-14 items-center justify-center rounded-full bg-[linear-gradient(145deg,var(--rosso-light),var(--rosso-dark))] text-white rosso-glow ring-4 ring-black/45 transition-transform active:scale-[0.88]"
-              style={{ height: "3.5rem", width: "3.5rem" }}
-            >
-              <Plus className="size-7" strokeWidth={2.5} />
-            </span>
-          </Link>
-        </div>
-      )}
 
       {/* Bottom nav */}
       <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto max-w-md px-3 pb-3">
@@ -114,4 +143,30 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </nav>
     </div>
   );
+}
+
+function buildNotifications(waterMl: number, sleepHours: number, mealCount: number) {
+  const items: { title: string; description: string; href: string }[] = [];
+  if (mealCount === 0) {
+    items.push({
+      title: "Log your first meal",
+      description: "Your calorie and macro graphs need today's meals.",
+      href: "/log",
+    });
+  }
+  if (waterMl < 2000) {
+    items.push({
+      title: "Hydration check",
+      description: `${(waterMl / 1000).toFixed(1)}L logged today. Add water from Today.`,
+      href: "/dashboard",
+    });
+  }
+  if (sleepHours === 0) {
+    items.push({
+      title: "Add sleep",
+      description: "Log last night's sleep so Stats can build your trend.",
+      href: "/dashboard",
+    });
+  }
+  return items.slice(0, 3);
 }

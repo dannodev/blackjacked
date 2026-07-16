@@ -14,6 +14,7 @@ import type {
   FoodItem,
   Squad,
   SquadMember,
+  DailySummary,
 } from "./types";
 import { todayKey } from "./types";
 import { FOODS } from "./foods-seed";
@@ -53,7 +54,9 @@ interface State {
   recipes: Recipe[];
   customFoods: FoodItem[];
   customMenuMeals: MenuMealPreset[];
+  favoriteExerciseIds: string[];
   useDefaultMenu: boolean;
+  dailySummaries: DailySummary[];
   streaks: Streaks;
   waterToday: number;
   sleepToday: number;
@@ -68,12 +71,15 @@ interface State {
   setExerciseLogs: (logs: ExerciseLog[]) => void;
   addExerciseLog: (e: ExerciseLog) => void;
   deleteExerciseLog: (id: string) => void;
+  toggleFavoriteExercise: (id: string) => void;
   setWeightLogs: (logs: WeightLog[]) => void;
   addWeightLog: (w: WeightLog) => void;
   addCustomFood: (f: FoodItem) => void;
   addCustomMenuMeal: (meal: MenuMealPreset) => void;
   deleteCustomMenuMeal: (id: string) => void;
   setUseDefaultMenu: (enabled: boolean) => void;
+  setDailySummaries: (summaries: DailySummary[]) => void;
+  upsertDailySummary: (summary: DailySummary) => void;
   addRecipe: (r: Recipe) => void;
   deleteRecipe: (id: string) => void;
   setWater: (ml: number) => void;
@@ -104,7 +110,9 @@ export const useStore = create<State>()(
       recipes: [],
       customFoods: [],
       customMenuMeals: [],
+      favoriteExerciseIds: [],
       useDefaultMenu: true,
+      dailySummaries: [],
       streaks: emptyStreaks(),
       waterToday: 0,
       sleepToday: 0,
@@ -145,6 +153,12 @@ export const useStore = create<State>()(
       },
       deleteExerciseLog: (id) =>
         set((s) => ({ exerciseLogs: s.exerciseLogs.filter((e) => e.id !== id) })),
+      toggleFavoriteExercise: (id) =>
+        set((s) => ({
+          favoriteExerciseIds: s.favoriteExerciseIds.includes(id)
+            ? s.favoriteExerciseIds.filter((exerciseId) => exerciseId !== id)
+            : [...s.favoriteExerciseIds, id],
+        })),
 
       setWeightLogs: (logs) =>
         set((s) => {
@@ -178,6 +192,25 @@ export const useStore = create<State>()(
           customMenuMeals: s.customMenuMeals.filter((meal) => meal.id !== id),
         })),
       setUseDefaultMenu: (enabled) => set({ useDefaultMenu: enabled }),
+      setDailySummaries: (summaries) =>
+        set((s) => {
+          const merged = new Map(s.dailySummaries.map((summary) => [summary.date, summary]));
+          for (const summary of summaries) merged.set(summary.date, summary);
+          return {
+            dailySummaries: [...merged.values()].sort((a, b) =>
+              a.date.localeCompare(b.date),
+            ),
+          };
+        }),
+      upsertDailySummary: (summary) =>
+        set((s) => {
+          const existing = s.dailySummaries.filter((item) => item.date !== summary.date);
+          return {
+            dailySummaries: [...existing, summary].sort((a, b) =>
+              a.date.localeCompare(b.date),
+            ),
+          };
+        }),
 
       addRecipe: (r) => set((s) => ({ recipes: [...s.recipes, r] })),
       deleteRecipe: (id) =>
@@ -265,7 +298,9 @@ export const useStore = create<State>()(
           recipes: [],
           customFoods: [],
           customMenuMeals: [],
+          favoriteExerciseIds: [],
           useDefaultMenu: true,
+          dailySummaries: [],
           streaks: emptyStreaks(),
           waterToday: 0,
           sleepToday: 0,

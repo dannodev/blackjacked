@@ -14,13 +14,14 @@ import {
   Plus,
   Send,
   ShieldCheck,
+  Target,
   Utensils,
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
-import { sameDay, todayKey } from "@/lib/types";
+import { computeDay, normalizeGoal, sameDay, todayKey } from "@/lib/types";
 import {
   createRemoteSquad,
   joinRemoteSquad,
@@ -53,6 +54,7 @@ export default function SquadPage() {
   const meals = useStore((s) => s.meals);
   const exerciseLogs = useStore((s) => s.exerciseLogs);
   const streaks = useStore((s) => s.streaks);
+  const profile = useStore((s) => s.profile)!;
 
   const [snapshot, setSnapshot] = useState<SquadSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
@@ -67,6 +69,14 @@ export default function SquadPage() {
   const publicActivity = useMemo(() => {
     const todayMeals = meals.filter((meal) => sameDay(meal.loggedAt, today));
     const todayExercises = exerciseLogs.filter((log) => sameDay(log.loggedAt, today));
+    const day = computeDay(todayMeals, todayExercises, profile);
+    const goal = normalizeGoal(profile);
+    const calorieTargetMet =
+      goal.mode === "gain"
+        ? day.kcal_in >= profile.calorie_goal
+        : goal.mode === "maintain"
+          ? Math.abs(day.kcal_in - profile.calorie_goal) <= 150
+          : day.kcal_in <= profile.calorie_goal && day.kcal_in > 0;
 
     return {
       date: today,
@@ -78,8 +88,14 @@ export default function SquadPage() {
       mealsCount: todayMeals.length,
       workoutsCount: todayExercises.length,
       streaks,
+      goalMode: goal.mode,
+      goalProgressPct: goal.progress,
+      goalDeltaKg: goal.currentDelta,
+      goalTargetDeltaKg: goal.targetDelta,
+      calorieTargetMet,
+      exerciseDone: todayExercises.length > 0,
     };
-  }, [exerciseLogs, meals, streaks, today]);
+  }, [exerciseLogs, meals, profile, streaks, today]);
 
   const refreshSquad = useCallback(async () => {
     const next = await loadMySquad();
@@ -290,7 +306,7 @@ export default function SquadPage() {
         <SquadHeader
           eyebrow={`${members.length} racer${members.length === 1 ? "" : "s"}`}
           title={snapshot.squad.name}
-          subtitle="Live workouts, meals, calories burned, and messages. No height or weight is shared."
+          subtitle="Live workouts, meals, calories burned, progress, and messages. Body stats stay private."
         />
         <Button
           variant="outline"
@@ -336,8 +352,9 @@ export default function SquadPage() {
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">
           Squad members only see today&apos;s meals count, calories in, calories
-          burned from workouts, workout count, and streak. Height, weight,
-          birthdate, and body measurements never sync to the squad.
+          burned from workouts, workout count, streak, goal type, progress
+          percentage, and completion flags. Height, weight, birthdate, and body
+          measurements never sync to the squad. No height or weight is shared.
         </CardContent>
       </Card>
 
@@ -443,6 +460,10 @@ function MemberCard({
   const meals = activity?.meals_count ?? 0;
   const workouts = activity?.workouts_count ?? 0;
   const streak = activity?.streak ?? 0;
+  const goalProgress = Math.round(activity?.goal_progress_pct ?? 0);
+  const goalMode = activity?.goal_mode ?? "lose";
+  const calorieTargetMet = activity?.calorie_target_met ?? false;
+  const exerciseDone = activity?.exercise_done ?? workouts > 0;
 
   return (
     <motion.div
@@ -495,11 +516,67 @@ function MemberCard({
                   value={String(workouts)}
                 />
               </div>
+              <div className="mt-3 rounded-2xl border border-white/7 bg-white/[0.035] p-2.5">
+                <div className="mb-1.5 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Target className="size-3.5" />
+                    <span className="capitalize">{goalMode} goal</span>
+                  </div>
+                  <span className="text-xs font-bold text-[var(--rosso-light)]">
+                    {goalProgress}%
+                  </span>
+                </div>
+                <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+                  <div
+                    className="h-full rounded-full bg-[var(--rosso)]"
+                    style={{ width: `${Math.min(100, goalProgress)}%` }}
+                  />
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-2 text-[11px]">
+                  <StatusPill
+                    label="Calories"
+                    ok={calorieTargetMet}
+                    good="target hit"
+                    bad="pending"
+                  />
+                  <StatusPill
+                    label="Exercise"
+                    ok={exerciseDone}
+                    good="done"
+                    bad="not yet"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </CardContent>
       </Card>
     </motion.div>
+  );
+}
+
+function StatusPill({
+  label,
+  ok,
+  good,
+  bad,
+}: {
+  label: string;
+  ok: boolean;
+  good: string;
+  bad: string;
+}) {
+  return (
+    <div
+      className={
+        "rounded-full px-2 py-1 " +
+        (ok
+          ? "bg-[var(--aqua)]/10 text-[var(--aqua)]"
+          : "bg-white/[0.045] text-muted-foreground")
+      }
+    >
+      {label}: {ok ? good : bad}
+    </div>
   );
 }
 

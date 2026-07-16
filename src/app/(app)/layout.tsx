@@ -12,6 +12,8 @@ import { loadSupabaseProfile } from "@/lib/supabase/profile";
 import { loadSupabaseWeightLogs } from "@/lib/supabase/weight-logs";
 import { loadSupabaseMeals } from "@/lib/supabase/meals";
 import { loadSupabaseExerciseLogs } from "@/lib/supabase/exercise-logs";
+import { loadSupabaseDailySummaries } from "@/lib/supabase/daily-summary";
+import { dateKey } from "@/lib/types";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -22,6 +24,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const setMeals = useStore((s) => s.setMeals);
   const setExerciseLogs = useStore((s) => s.setExerciseLogs);
   const setWeightLogs = useStore((s) => s.setWeightLogs);
+  const setDailySummaries = useStore((s) => s.setDailySummaries);
+  const setWater = useStore((s) => s.setWater);
+  const setSleep = useStore((s) => s.setSleep);
   const [profileChecked, setProfileChecked] = useState(false);
 
   useEffect(() => {
@@ -112,6 +117,35 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       cancelled = true;
     };
   }, [hydrated, profile, setExerciseLogs, user]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function syncDailySummaries() {
+      if (!hydrated || !user || !profile || !isSupabaseConfigured()) return;
+
+      try {
+        const remoteSummaries = await loadSupabaseDailySummaries(user.id);
+        if (!cancelled && remoteSummaries.length > 0) {
+          setDailySummaries(remoteSummaries);
+          const todaySummary = remoteSummaries.find(
+            (summary) => summary.date === dateKey(new Date()),
+          );
+          if (todaySummary) {
+            setWater(todaySummary.water_ml);
+            setSleep(todaySummary.sleep_hours);
+          }
+        }
+      } catch {
+        // Local hydration/sleep tracking still works if cloud sync is temporarily unavailable.
+      }
+    }
+
+    void syncDailySummaries();
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrated, profile, setDailySummaries, setSleep, setWater, user]);
 
   useEffect(() => {
     if (hydrated && user && profileChecked && !profile) router.replace("/onboarding");

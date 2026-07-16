@@ -42,6 +42,12 @@ export type SquadActivityRow = {
   workouts_count: number;
   meals_count: number;
   streak: number;
+  goal_mode: "lose" | "gain" | "maintain" | null;
+  goal_progress_pct: number;
+  goal_delta_kg: number;
+  goal_target_delta_kg: number;
+  calorie_target_met: boolean;
+  exercise_done: boolean;
   updated_at: string;
 };
 
@@ -67,6 +73,12 @@ export type PublicActivityInput = {
   workoutsCount: number;
   mealsCount: number;
   streaks: Streaks;
+  goalMode?: "lose" | "gain" | "maintain";
+  goalProgressPct?: number;
+  goalDeltaKg?: number;
+  goalTargetDeltaKg?: number;
+  calorieTargetMet?: boolean;
+  exerciseDone?: boolean;
 };
 
 function e2eSnapshot(): SquadSnapshot {
@@ -303,6 +315,12 @@ export async function syncMySquadActivity(
         workouts_count: activity.workoutsCount,
         meals_count: activity.mealsCount,
         streak: activity.streaks.current_streak,
+        goal_mode: activity.goalMode ?? null,
+        goal_progress_pct: activity.goalProgressPct ?? 0,
+        goal_delta_kg: activity.goalDeltaKg ?? 0,
+        goal_target_delta_kg: activity.goalTargetDeltaKg ?? 0,
+        calorie_target_met: activity.calorieTargetMet ?? false,
+        exercise_done: activity.exerciseDone ?? activity.workoutsCount > 0,
         updated_at: new Date().toISOString(),
       },
     ];
@@ -322,6 +340,12 @@ export async function syncMySquadActivity(
       workouts_count: activity.workoutsCount,
       meals_count: activity.mealsCount,
       streak: activity.streaks.current_streak,
+      goal_mode: activity.goalMode ?? null,
+      goal_progress_pct: activity.goalProgressPct ?? 0,
+      goal_delta_kg: activity.goalDeltaKg ?? 0,
+      goal_target_delta_kg: activity.goalTargetDeltaKg ?? 0,
+      calorie_target_met: activity.calorieTargetMet ?? false,
+      exercise_done: activity.exerciseDone ?? activity.workoutsCount > 0,
       updated_at: new Date().toISOString(),
     },
     { onConflict: "squad_id,user_id,date" },

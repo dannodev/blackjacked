@@ -12,8 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ACTIVITY_OPTIONS, type MealSchedule } from "@/lib/types";
-import { Bolt, Bell, BellOff, Camera, Clock3, Trash2, Users } from "lucide-react";
+import { ACTIVITY_OPTIONS, normalizeGoal, type MealSchedule } from "@/lib/types";
+import { Bolt, Bell, BellOff, Camera, Clock3, Target, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -125,9 +125,18 @@ export default function ProfilePage() {
   const router = useRouter();
   const [remindersOn, setRemindersOn] = useState(false);
   const [savingTimes, setSavingTimes] = useState(false);
+  const [savingGoal, setSavingGoal] = useState(false);
   const [mealTimes, setMealTimes] = useState(() =>
     normalizeSchedule(profile.meal_schedule),
   );
+  const [goalDraft, setGoalDraft] = useState(() => {
+    const goal = normalizeGoal(profile);
+    return {
+      goal_mode: goal.mode,
+      goal_target_weight_kg: goal.targetWeight,
+      goal_target_date: goal.targetDate ?? "",
+    };
+  });
   const [savingAvatar, setSavingAvatar] = useState(false);
 
   useEffect(() => {
@@ -186,6 +195,41 @@ export default function ProfilePage() {
       toast.error(error instanceof Error ? error.message : "Could not save meal times");
     } finally {
       setSavingTimes(false);
+    }
+  }
+
+  async function saveGoal() {
+    const nextProfile = {
+      ...profile,
+      goal_mode: goalDraft.goal_mode,
+      goal_start_weight_kg:
+        profile.goal_start_weight_kg ?? profile.current_weight_kg,
+      goal_target_weight_kg:
+        goalDraft.goal_mode === "maintain"
+          ? profile.current_weight_kg
+          : goalDraft.goal_target_weight_kg,
+      goal_start_date:
+        profile.goal_start_date ?? new Date().toISOString().slice(0, 10),
+      goal_target_date: goalDraft.goal_target_date || undefined,
+    };
+
+    try {
+      setSavingGoal(true);
+      const saved = user
+        ? await saveSupabaseProfile(user.id, nextProfile)
+        : nextProfile;
+      updateProfile({
+        goal_mode: saved.goal_mode,
+        goal_start_weight_kg: saved.goal_start_weight_kg,
+        goal_target_weight_kg: saved.goal_target_weight_kg,
+        goal_start_date: saved.goal_start_date,
+        goal_target_date: saved.goal_target_date,
+      });
+      toast.success("Goal saved");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not save goal");
+    } finally {
+      setSavingGoal(false);
     }
   }
 
@@ -318,6 +362,90 @@ export default function ProfilePage() {
           <Row label="Protein" value={`${profile.protein_goal} g`} />
           <Row label="Carbs" value={`${profile.carb_goal} g`} />
           <Row label="Fat" value={`${profile.fat_goal} g`} />
+        </CardContent>
+      </Card>
+
+      <Card className="carbon-card rounded-[1.5rem] border-white/7">
+        <CardHeader>
+          <CardTitle className="font-heading text-base flex items-center gap-2">
+            <Target className="size-4 text-[var(--rosso-light)]" />
+            Long-term goal
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-3 gap-2">
+            {(["lose", "maintain", "gain"] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() =>
+                  setGoalDraft((current) => ({
+                    ...current,
+                    goal_mode: mode,
+                    goal_target_weight_kg:
+                      mode === "maintain"
+                        ? profile.current_weight_kg
+                        : current.goal_target_weight_kg,
+                  }))
+                }
+                className={
+                  "rounded-full border px-2 py-2 text-xs font-semibold capitalize transition-colors " +
+                  (goalDraft.goal_mode === mode
+                    ? "border-[var(--rosso)] bg-[var(--rosso)]/12 text-[var(--rosso-light)]"
+                    : "border-white/10 text-muted-foreground")
+                }
+              >
+                {mode}
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="profile-target-weight" className="text-xs">
+                Target weight (kg)
+              </Label>
+              <Input
+                id="profile-target-weight"
+                type="number"
+                step="0.1"
+                value={goalDraft.goal_target_weight_kg}
+                disabled={goalDraft.goal_mode === "maintain"}
+                onChange={(event) =>
+                  setGoalDraft((current) => ({
+                    ...current,
+                    goal_target_weight_kg: +event.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="profile-target-date" className="text-xs">
+                Target date
+              </Label>
+              <Input
+                id="profile-target-date"
+                type="date"
+                value={goalDraft.goal_target_date}
+                onChange={(event) =>
+                  setGoalDraft((current) => ({
+                    ...current,
+                    goal_target_date: event.target.value,
+                  }))
+                }
+              />
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Squad members only see your goal type and progress percentage,
+            never your actual weight or height.
+          </p>
+          <Button
+            className="w-full bg-[var(--rosso)] font-semibold text-white hover:bg-[var(--rosso)]/90"
+            onClick={saveGoal}
+            disabled={savingGoal}
+          >
+            {savingGoal ? "Saving..." : "Save goal"}
+          </Button>
         </CardContent>
       </Card>
 

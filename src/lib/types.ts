@@ -1,6 +1,7 @@
 export type Sex = "male" | "female";
 export type ActivityFactor = 1.2 | 1.375 | 1.55 | 1.725 | 1.9;
 export type MealType = "breakfast" | "lunch" | "dinner" | "snack";
+export type GoalMode = "lose" | "gain" | "maintain";
 export type MealSchedule = {
   breakfast_time?: string | null;
   lunch_time?: string | null;
@@ -40,8 +41,49 @@ export interface Profile {
   carb_goal: number;
   createdAt: string;
   meal_schedule?: MealSchedule;
+  goal_mode?: GoalMode;
+  goal_start_weight_kg?: number;
+  goal_target_weight_kg?: number;
+  goal_start_date?: string;
+  goal_target_date?: string;
   avatar_url?: string;
   avatar_public_id?: string;
+}
+
+export function normalizeGoal(profile: Profile) {
+  const mode = profile.goal_mode ?? "lose";
+  const startWeight = profile.goal_start_weight_kg ?? profile.current_weight_kg;
+  const targetWeight =
+    profile.goal_target_weight_kg ??
+    (mode === "lose"
+      ? startWeight * 0.9
+      : mode === "gain"
+        ? startWeight * 1.05
+        : startWeight);
+  const targetDelta = Math.abs(targetWeight - startWeight);
+  const currentDelta =
+    mode === "lose"
+      ? startWeight - profile.current_weight_kg
+      : mode === "gain"
+        ? profile.current_weight_kg - startWeight
+        : targetDelta - Math.abs(profile.current_weight_kg - targetWeight);
+  const progress =
+    targetDelta <= 0
+      ? mode === "maintain"
+        ? 100
+        : 0
+      : Math.max(0, Math.min(100, (currentDelta / targetDelta) * 100));
+
+  return {
+    mode,
+    startWeight,
+    targetWeight,
+    targetDelta,
+    currentDelta,
+    progress,
+    startDate: profile.goal_start_date ?? profile.createdAt.slice(0, 10),
+    targetDate: profile.goal_target_date ?? null,
+  };
 }
 
 export interface FoodItem {
@@ -86,6 +128,7 @@ export interface Exercise {
   category: ExerciseCategory;
   mets: number;
   distance_based?: boolean;
+  fixed_kcal_per_25_min?: number;
 }
 
 export interface ExerciseLog {
@@ -171,6 +214,13 @@ export function adlKcal(tdee: number, bmr: number): number {
 export function activityKcal(mets: number, weight_kg: number, min: number): number {
   const hours = min / 60;
   return mets * weight_kg * hours;
+}
+
+export function exerciseKcal(exercise: Exercise, weight_kg: number, min: number): number {
+  if (exercise.fixed_kcal_per_25_min) {
+    return (exercise.fixed_kcal_per_25_min / 25) * min;
+  }
+  return activityKcal(exercise.mets, weight_kg, min);
 }
 
 export interface DailyTotals {

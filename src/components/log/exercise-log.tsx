@@ -8,7 +8,7 @@ import { useCloudExerciseLogs } from "@/lib/use-cloud-exercise-logs";
 import { makeId } from "@/lib/id";
 import { EXERCISES, CATEGORY_LABELS } from "@/lib/exercises-seed";
 import type { Exercise, ExerciseCategory, ExerciseLog } from "@/lib/types";
-import { activityKcal } from "@/lib/types";
+import { exerciseKcal } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,7 +19,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { Search, Plus, Sparkles, Loader2 } from "lucide-react";
+import { Search, Plus, Sparkles, Loader2, Star } from "lucide-react";
 import { aiExerciseMatch } from "@/lib/ai";
 
 const CATEGORIES: (ExerciseCategory | "all")[] = [
@@ -34,6 +34,8 @@ const CATEGORIES: (ExerciseCategory | "all")[] = [
 
 export function ExerciseLogForm() {
   const profile = useStore((s) => s.profile)!;
+  const favoriteExerciseIds = useStore((s) => s.favoriteExerciseIds);
+  const toggleFavoriteExercise = useStore((s) => s.toggleFavoriteExercise);
   const { addExerciseLog } = useCloudExerciseLogs();
   const [cat, setCat] = useState<ExerciseCategory | "all">("all");
   const [query, setQuery] = useState("");
@@ -55,8 +57,11 @@ export function ExerciseLogForm() {
   }, [cat, query]);
 
   const kcal = selected
-    ? activityKcal(selected.mets, profile.current_weight_kg, duration)
+    ? exerciseKcal(selected, profile.current_weight_kg, duration)
     : 0;
+  const favoriteExercises = favoriteExerciseIds
+    .map((id) => EXERCISES.find((exercise) => exercise.id === id))
+    .filter((exercise): exercise is Exercise => Boolean(exercise));
 
   async function log() {
     if (!selected) {
@@ -122,6 +127,31 @@ export function ExerciseLogForm() {
   return (
     <div className="space-y-4">
       {/* categories */}
+      {favoriteExercises.length > 0 && !selected && (
+        <section className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Star className="size-4 fill-[var(--amber)] text-[var(--amber)]" />
+            <h2 className="font-heading text-sm font-bold">Favorites</h2>
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {favoriteExercises.map((exercise) => (
+              <button
+                key={exercise.id}
+                type="button"
+                onClick={() => setSelected(exercise)}
+                className="flex w-36 shrink-0 flex-col gap-1 rounded-[1.25rem] border border-[var(--amber)]/25 bg-[var(--amber)]/10 p-3 text-left transition-colors hover:bg-[var(--amber)]/15"
+              >
+                <span className="text-[11px] font-semibold text-[var(--amber)]">
+                  {CATEGORY_LABELS[exercise.category]}
+                </span>
+                <span className="text-sm font-bold leading-tight">{exercise.name}</span>
+                <span className="text-[10px] text-muted-foreground">{exercise.mets} MET</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
       <div className="flex gap-1.5 overflow-x-auto pb-1">
         {CATEGORIES.map((c) => (
           <button
@@ -251,20 +281,51 @@ export function ExerciseLogForm() {
       ) : (
         <div className="space-y-1.5">
           {list.map((e) => (
-            <button
+            <div
               key={e.id}
-              type="button"
-              onClick={() => setSelected(e)}
-              className="flex w-full items-center justify-between rounded-2xl border border-white/7 bg-white/[0.045] px-3 py-2.5 text-left transition-colors hover:bg-white/[0.075]"
+              className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/7 bg-white/[0.045] px-3 py-2.5 text-left transition-colors hover:bg-white/[0.075]"
             >
-              <div>
+              <button
+                type="button"
+                onClick={() => setSelected(e)}
+                className="min-w-0 flex-1 text-left"
+              >
                 <p className="text-sm font-medium">{e.name}</p>
                 <p className="text-xs text-muted-foreground">
                   {CATEGORY_LABELS[e.category]} · {e.mets} MET
                 </p>
+              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  aria-label={
+                    favoriteExerciseIds.includes(e.id)
+                      ? `Unstar ${e.name}`
+                      : `Star ${e.name}`
+                  }
+                  className="flex size-8 items-center justify-center rounded-full border border-white/10 text-muted-foreground transition-colors hover:border-[var(--amber)]/40 hover:text-[var(--amber)]"
+                  onClick={() => {
+                    toggleFavoriteExercise(e.id);
+                  }}
+                >
+                  <Star
+                    className={
+                      favoriteExerciseIds.includes(e.id)
+                        ? "size-4 fill-[var(--amber)] text-[var(--amber)]"
+                        : "size-4"
+                    }
+                  />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelected(e)}
+                  aria-label={`Select ${e.name}`}
+                  className="flex size-8 items-center justify-center rounded-full text-[var(--rosso-light)]"
+                >
+                  <Plus className="size-4" />
+                </button>
               </div>
-              <Plus className="size-4 text-[var(--rosso-light)]" />
-            </button>
+            </div>
           ))}
           {list.length === 0 && (
             <p className="py-6 text-center text-sm text-muted-foreground">
