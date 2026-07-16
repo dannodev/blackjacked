@@ -42,7 +42,7 @@ export default function SignupPage() {
     try {
       await signUp(values.name, values.email, values.password);
       toast.success("Account created");
-      router.replace("/dashboard");
+      router.replace("/onboarding");
     } catch {
       toast.error("Something went wrong");
     }
