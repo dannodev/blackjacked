@@ -1,6 +1,6 @@
 "use client";
 
-import { useForm, type Resolver } from "react-hook-form";
+import { useForm, type Resolver, type UseFormRegisterReturn } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
@@ -43,6 +43,11 @@ const goalSchema = z.object({
   protein_goal: z.coerce.number().min(0),
   fat_goal: z.coerce.number().min(0),
   carb_goal: z.coerce.number().min(0),
+  breakfast_time: z.string().optional(),
+  lunch_time: z.string().optional(),
+  dinner_time: z.string().optional(),
+  am_snack_time: z.string().optional(),
+  pm_snack_time: z.string().optional(),
 });
 type Goal = z.infer<typeof goalSchema>;
 
@@ -133,6 +138,13 @@ export default function OnboardingPage() {
       protein_goal: values.protein_goal,
       fat_goal: values.fat_goal,
       carb_goal: values.carb_goal,
+      meal_schedule: {
+        breakfast_time: values.breakfast_time || null,
+        lunch_time: values.lunch_time || null,
+        dinner_time: values.dinner_time || null,
+        am_snack_time: values.am_snack_time || null,
+        pm_snack_time: values.pm_snack_time || null,
+      },
       createdAt: new Date().toISOString(),
     };
 
@@ -380,6 +392,47 @@ export default function OnboardingPage() {
                 </div>
               </CardContent>
             </Card>
+            <Card className="carbon-card rounded-[1.6rem] border-white/7">
+              <CardHeader>
+                <CardTitle className="font-heading text-base">
+                  Meal times
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-xs text-muted-foreground">
+                  Optional. These decide whether the dashboard shows breakfast,
+                  snack, lunch, or dinner options. If you don&apos;t know yet,
+                  skip this and set it later in Profile.
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <TimeField
+                    id="breakfast_time"
+                    label="Breakfast"
+                    register={goalForm.register("breakfast_time")}
+                  />
+                  <TimeField
+                    id="am_snack_time"
+                    label="AM snack"
+                    register={goalForm.register("am_snack_time")}
+                  />
+                  <TimeField
+                    id="lunch_time"
+                    label="Lunch"
+                    register={goalForm.register("lunch_time")}
+                  />
+                  <TimeField
+                    id="pm_snack_time"
+                    label="PM snack"
+                    register={goalForm.register("pm_snack_time")}
+                  />
+                  <TimeField
+                    id="dinner_time"
+                    label="Dinner"
+                    register={goalForm.register("dinner_time")}
+                  />
+                </div>
+              </CardContent>
+            </Card>
             <div className="flex gap-2">
               <Button
                 type="button"
@@ -400,6 +453,25 @@ export default function OnboardingPage() {
           </motion.form>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+function TimeField({
+  id,
+  label,
+  register,
+}: {
+  id: string;
+  label: string;
+  register: UseFormRegisterReturn;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id} className="text-xs">
+        {label}
+      </Label>
+      <Input id={id} type="time" {...register} />
     </div>
   );
 }

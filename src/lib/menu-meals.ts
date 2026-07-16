@@ -1,4 +1,4 @@
-import type { MealType } from "./types";
+import type { MealSchedule, MealType } from "./types";
 
 export interface MenuMealPreset {
   id: string;
@@ -306,24 +306,124 @@ export const MENU_MEAL_PRESETS: MenuMealPreset[] = [
 
 const DAYS_OF_WEEK = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
+type MealWindow = {
+  key: keyof MealSchedule;
+  label: string;
+  slot: string;
+  fallbackTime: string;
+  beforeMinutes: number;
+  afterMinutes: number;
+};
+
+const MEAL_WINDOWS: MealWindow[] = [
+  {
+    key: "breakfast_time",
+    label: "Breakfast",
+    slot: "Breakfast",
+    fallbackTime: "07:30",
+    beforeMinutes: 90,
+    afterMinutes: 90,
+  },
+  {
+    key: "am_snack_time",
+    label: "AM snack",
+    slot: "AM snack",
+    fallbackTime: "10:30",
+    beforeMinutes: 45,
+    afterMinutes: 45,
+  },
+  {
+    key: "lunch_time",
+    label: "Lunch",
+    slot: "Lunch",
+    fallbackTime: "13:30",
+    beforeMinutes: 90,
+    afterMinutes: 90,
+  },
+  {
+    key: "pm_snack_time",
+    label: "PM snack",
+    slot: "PM snack",
+    fallbackTime: "16:30",
+    beforeMinutes: 45,
+    afterMinutes: 45,
+  },
+  {
+    key: "dinner_time",
+    label: "Dinner",
+    slot: "Dinner",
+    fallbackTime: "20:00",
+    beforeMinutes: 120,
+    afterMinutes: 120,
+  },
+];
+
+function minutesFromTime(value: string) {
+  const [hours, minutes] = value.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
+function minutesNow(at: Date) {
+  return at.getHours() * 60 + at.getMinutes();
+}
+
+export function getActiveMealWindow(
+  schedule?: MealSchedule,
+  at = new Date(),
+) {
+  const now = minutesNow(at);
+  const windows = MEAL_WINDOWS.map((window) => {
+    const time = schedule?.[window.key] || window.fallbackTime;
+    const center = minutesFromTime(time);
+    return { ...window, time, center };
+  });
+
+  const active = windows.find(
+    (window) =>
+      now >= window.center - window.beforeMinutes &&
+      now <= window.center + window.afterMinutes,
+  );
+
+  if (active) return active;
+
+  return windows.reduce((closest, window) => {
+    const currentDistance = Math.abs(now - window.center);
+    const closestDistance = Math.abs(now - closest.center);
+    return currentDistance < closestDistance ? window : closest;
+  }, windows[0]);
+}
+
 export function getTodayMeals(): MenuMealPreset[] {
   const today = DAYS_OF_WEEK[new Date().getDay()];
   return MENU_MEAL_PRESETS.filter((m) => m.day === today);
 }
 
-export function getNextMealToLog(remainingKcal: number): MenuMealPreset | null {
+export function getCurrentMealOptions(
+  schedule?: MealSchedule,
+  at = new Date(),
+): {
+  label: string;
+  time: string;
+  options: MenuMealPreset[];
+} {
+  const active = getActiveMealWindow(schedule, at);
+  return {
+    label: active.label,
+    time: active.time,
+    options: MENU_MEAL_PRESETS.filter((meal) => meal.meal_slot === active.slot),
+  };
+}
+
+export function getNextMealToLog(
+  remainingKcal: number,
+  schedule?: MealSchedule,
+): MenuMealPreset | null {
   const today = getTodayMeals();
   if (today.length === 0) return null;
 
-  const hour = new Date().getHours();
-  let targetSlot: string;
-  if (hour < 11) targetSlot = "Breakfast";
-  else if (hour < 12) targetSlot = "AM snack";
-  else if (hour < 15) targetSlot = "Lunch";
-  else if (hour < 18) targetSlot = "PM snack";
-  else targetSlot = "Dinner";
-
-  const target = today.find((m) => m.meal_slot === targetSlot);
+  const target = today.find(
+    (m) => m.meal_slot === getActiveMealWindow(schedule).slot,
+  );
   if (target && target.kcal <= remainingKcal + 50) return target;
 
   const firstNotLogged = today.find((m) => m.kcal <= remainingKcal + 100);

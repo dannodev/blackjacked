@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
 import { useTodayData, sortToday } from "@/lib/use-today-data";
 import { computeDay, MEAL_LABELS, type Meal } from "@/lib/types";
-import { getNextMealToLog, getTodayMeals } from "@/lib/menu-meals";
+import { getCurrentMealOptions, getNextMealToLog } from "@/lib/menu-meals";
 import { makeId } from "@/lib/id";
 import { DeficitRing } from "@/components/deficit-ring";
 import { Card, CardContent } from "@/components/ui/card";
@@ -41,8 +41,11 @@ export default function DashboardPage() {
 
   const firstName = user?.name?.split(" ")[0] ?? "Athlete";
 
-  const recommendation = getNextMealToLog(day.remaining_vs_goal);
-  const todayMenuMeals = getTodayMeals();
+  const recommendation = getNextMealToLog(
+    day.remaining_vs_goal,
+    profile.meal_schedule,
+  );
+  const currentMealOptions = getCurrentMealOptions(profile.meal_schedule);
   const loggedMealNames = new Set(meals.flatMap((m) => m.items.map((i) => i.name)));
 
   function quickLogRecommendation() {
@@ -204,10 +207,17 @@ export default function DashboardPage() {
         </motion.div>
       )}
 
-      {/* today's menu preview */}
+      {/* current meal options */}
       <motion.div variants={item}>
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="font-heading text-sm font-bold">Today&apos;s plan</h2>
+          <div>
+            <h2 className="font-heading text-sm font-bold">
+              {currentMealOptions.label} options
+            </h2>
+            <p className="text-[11px] text-muted-foreground">
+              Based on your {currentMealOptions.time} meal time
+            </p>
+          </div>
           <Link
             href="/log?type=food"
             className="text-xs font-semibold text-[var(--rosso-light)] hover:underline"
@@ -216,7 +226,7 @@ export default function DashboardPage() {
           </Link>
         </div>
         <div className="flex gap-2 overflow-x-auto pb-1">
-          {todayMenuMeals.map((m) => {
+          {currentMealOptions.options.map((m) => {
             const isLogged = loggedMealNames.has(m.name);
             return (
               <Link

@@ -1,7 +1,7 @@
 "use client";
 
 import { getSupabaseBrowser, isSupabaseConfigured } from "@/lib/supabase/client";
-import type { ActivityFactor, Profile, Sex } from "@/lib/types";
+import type { ActivityFactor, MealSchedule, Profile, Sex } from "@/lib/types";
 
 type ProfileRow = {
   id: string;
@@ -14,8 +14,25 @@ type ProfileRow = {
   protein_goal: number;
   fat_goal: number;
   carb_goal: number;
+  breakfast_time: string | null;
+  lunch_time: string | null;
+  dinner_time: string | null;
+  am_snack_time: string | null;
+  pm_snack_time: string | null;
   created_at: string;
 };
+
+const PROFILE_COLUMNS =
+  "id, sex, birthdate, height_cm, current_weight_kg, activity_factor, calorie_goal, protein_goal, fat_goal, carb_goal, breakfast_time, lunch_time, dinner_time, am_snack_time, pm_snack_time, created_at";
+
+function normalizeTime(value?: string | null) {
+  if (!value) return null;
+  return value.slice(0, 5);
+}
+
+function hasMealSchedule(schedule: MealSchedule) {
+  return Object.values(schedule).some(Boolean);
+}
 
 function fromRow(row: ProfileRow): Profile {
   return {
@@ -28,6 +45,13 @@ function fromRow(row: ProfileRow): Profile {
     protein_goal: row.protein_goal,
     fat_goal: row.fat_goal,
     carb_goal: row.carb_goal,
+    meal_schedule: {
+      breakfast_time: normalizeTime(row.breakfast_time),
+      lunch_time: normalizeTime(row.lunch_time),
+      dinner_time: normalizeTime(row.dinner_time),
+      am_snack_time: normalizeTime(row.am_snack_time),
+      pm_snack_time: normalizeTime(row.pm_snack_time),
+    },
     createdAt: row.created_at,
   };
 }
@@ -44,6 +68,21 @@ function toRow(userId: string, profile: Profile): Omit<ProfileRow, "created_at">
     protein_goal: profile.protein_goal,
     fat_goal: profile.fat_goal,
     carb_goal: profile.carb_goal,
+    breakfast_time: hasMealSchedule(profile.meal_schedule ?? {})
+      ? normalizeTime(profile.meal_schedule?.breakfast_time)
+      : null,
+    lunch_time: hasMealSchedule(profile.meal_schedule ?? {})
+      ? normalizeTime(profile.meal_schedule?.lunch_time)
+      : null,
+    dinner_time: hasMealSchedule(profile.meal_schedule ?? {})
+      ? normalizeTime(profile.meal_schedule?.dinner_time)
+      : null,
+    am_snack_time: hasMealSchedule(profile.meal_schedule ?? {})
+      ? normalizeTime(profile.meal_schedule?.am_snack_time)
+      : null,
+    pm_snack_time: hasMealSchedule(profile.meal_schedule ?? {})
+      ? normalizeTime(profile.meal_schedule?.pm_snack_time)
+      : null,
   };
 }
 
@@ -53,9 +92,7 @@ export async function loadSupabaseProfile(userId: string): Promise<Profile | nul
   const supabase = getSupabaseBrowser();
   const { data, error } = await supabase
     .from("profiles")
-    .select(
-      "id, sex, birthdate, height_cm, current_weight_kg, activity_factor, calorie_goal, protein_goal, fat_goal, carb_goal, created_at",
-    )
+    .select(PROFILE_COLUMNS)
     .eq("id", userId)
     .maybeSingle();
 
@@ -73,9 +110,7 @@ export async function saveSupabaseProfile(
   const { data, error } = await supabase
     .from("profiles")
     .upsert(toRow(userId, profile), { onConflict: "id" })
-    .select(
-      "id, sex, birthdate, height_cm, current_weight_kg, activity_factor, calorie_goal, protein_goal, fat_goal, carb_goal, created_at",
-    )
+    .select(PROFILE_COLUMNS)
     .single();
 
   if (error) throw error;

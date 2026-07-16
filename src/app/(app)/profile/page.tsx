@@ -9,20 +9,49 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ACTIVITY_OPTIONS } from "@/lib/types";
-import { Bolt, Bell, BellOff, Users } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ACTIVITY_OPTIONS, type MealSchedule } from "@/lib/types";
+import { Bolt, Bell, BellOff, Clock3, Users } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import { saveSupabaseProfile } from "@/lib/supabase/profile";
+
+function emptySchedule(): Required<Record<keyof MealSchedule, string>> {
+  return {
+    breakfast_time: "",
+    am_snack_time: "",
+    lunch_time: "",
+    pm_snack_time: "",
+    dinner_time: "",
+  };
+}
+
+function normalizeSchedule(schedule?: MealSchedule) {
+  return {
+    ...emptySchedule(),
+    breakfast_time: schedule?.breakfast_time ?? "",
+    am_snack_time: schedule?.am_snack_time ?? "",
+    lunch_time: schedule?.lunch_time ?? "",
+    pm_snack_time: schedule?.pm_snack_time ?? "",
+    dinner_time: schedule?.dinner_time ?? "",
+  };
+}
 
 export default function ProfilePage() {
   const { user, signOut } = useAuth();
   const profile = useStore((s) => s.profile)!;
+  const updateProfile = useStore((s) => s.updateProfile);
   const streaks = useStore((s) => s.streaks);
   const resetAll = useStore((s) => s.resetAll);
   const router = useRouter();
   const [remindersOn, setRemindersOn] = useState(false);
+  const [savingTimes, setSavingTimes] = useState(false);
+  const [mealTimes, setMealTimes] = useState(() =>
+    normalizeSchedule(profile.meal_schedule),
+  );
 
   useEffect(() => {
     const stored = localStorage.getItem("blackjacked.reminders");
@@ -58,6 +87,30 @@ export default function ProfilePage() {
   const activity = ACTIVITY_OPTIONS.find(
     (o) => o.value === profile.activity_factor,
   );
+
+  async function saveMealTimes() {
+    const meal_schedule: MealSchedule = {
+      breakfast_time: mealTimes.breakfast_time || null,
+      am_snack_time: mealTimes.am_snack_time || null,
+      lunch_time: mealTimes.lunch_time || null,
+      pm_snack_time: mealTimes.pm_snack_time || null,
+      dinner_time: mealTimes.dinner_time || null,
+    };
+    const nextProfile = { ...profile, meal_schedule };
+
+    try {
+      setSavingTimes(true);
+      const saved = user
+        ? await saveSupabaseProfile(user.id, nextProfile)
+        : nextProfile;
+      updateProfile({ meal_schedule: saved.meal_schedule });
+      toast.success("Meal times saved");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not save meal times");
+    } finally {
+      setSavingTimes(false);
+    }
+  }
 
   function handleReset() {
     resetAll();
@@ -107,6 +160,70 @@ export default function ProfilePage() {
           <Row label="Protein" value={`${profile.protein_goal} g`} />
           <Row label="Carbs" value={`${profile.carb_goal} g`} />
           <Row label="Fat" value={`${profile.fat_goal} g`} />
+        </CardContent>
+      </Card>
+
+      <Card className="carbon-card rounded-[1.5rem] border-white/7">
+        <CardHeader>
+          <CardTitle className="font-heading text-base flex items-center gap-2">
+            <Clock3 className="size-4 text-[var(--rosso-light)]" />
+            Meal times
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            The dashboard uses these times to show breakfast, snack, lunch, or
+            dinner options from your menu.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <MealTimeInput
+              id="profile-breakfast"
+              label="Breakfast"
+              value={mealTimes.breakfast_time}
+              onChange={(value) =>
+                setMealTimes((current) => ({ ...current, breakfast_time: value }))
+              }
+            />
+            <MealTimeInput
+              id="profile-am-snack"
+              label="AM snack"
+              value={mealTimes.am_snack_time}
+              onChange={(value) =>
+                setMealTimes((current) => ({ ...current, am_snack_time: value }))
+              }
+            />
+            <MealTimeInput
+              id="profile-lunch"
+              label="Lunch"
+              value={mealTimes.lunch_time}
+              onChange={(value) =>
+                setMealTimes((current) => ({ ...current, lunch_time: value }))
+              }
+            />
+            <MealTimeInput
+              id="profile-pm-snack"
+              label="PM snack"
+              value={mealTimes.pm_snack_time}
+              onChange={(value) =>
+                setMealTimes((current) => ({ ...current, pm_snack_time: value }))
+              }
+            />
+            <MealTimeInput
+              id="profile-dinner"
+              label="Dinner"
+              value={mealTimes.dinner_time}
+              onChange={(value) =>
+                setMealTimes((current) => ({ ...current, dinner_time: value }))
+              }
+            />
+          </div>
+          <Button
+            className="w-full bg-[var(--rosso)] font-semibold text-white hover:bg-[var(--rosso)]/90"
+            onClick={saveMealTimes}
+            disabled={savingTimes}
+          >
+            {savingTimes ? "Saving..." : "Save meal times"}
+          </Button>
         </CardContent>
       </Card>
 
@@ -169,6 +286,32 @@ export default function ProfilePage() {
           Log out
         </Button>
       </div>
+    </div>
+  );
+}
+
+function MealTimeInput({
+  id,
+  label,
+  value,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id} className="text-xs">
+        {label}
+      </Label>
+      <Input
+        id={id}
+        type="time"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
     </div>
   );
 }

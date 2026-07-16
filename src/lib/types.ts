@@ -1,6 +1,13 @@
 export type Sex = "male" | "female";
 export type ActivityFactor = 1.2 | 1.375 | 1.55 | 1.725 | 1.9;
 export type MealType = "breakfast" | "lunch" | "dinner" | "snack";
+export type MealSchedule = {
+  breakfast_time?: string | null;
+  lunch_time?: string | null;
+  dinner_time?: string | null;
+  am_snack_time?: string | null;
+  pm_snack_time?: string | null;
+};
 export type ExerciseCategory =
   | "cardio"
   | "gym"
@@ -32,6 +39,7 @@ export interface Profile {
   fat_goal: number;
   carb_goal: number;
   createdAt: string;
+  meal_schedule?: MealSchedule;
 }
 
 export interface FoodItem {

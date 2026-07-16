@@ -28,12 +28,19 @@ export default function CheckInPage() {
   const [arm, setArm] = useState<number | "">("");
   const [photoUrl, setPhotoUrl] = useState<string | undefined>();
 
-  function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => setPhotoUrl(reader.result as string);
-    reader.readAsDataURL(file);
+
+    try {
+      const compressed = await compressPhoto(file);
+      setPhotoUrl(compressed);
+      toast.success("Photo ready", {
+        description: "Saved locally on this device, compressed to save space.",
+      });
+    } catch {
+      toast.error("Could not process photo");
+    }
   }
 
   function save() {
@@ -140,6 +147,10 @@ export default function CheckInPage() {
           {/* photo */}
           <div className="space-y-2">
             <Label className="text-xs">Progress photo (optional)</Label>
+            <p className="text-xs text-muted-foreground">
+              Photos stay local on this device and are compressed before saving.
+              They do not use Supabase storage.
+            </p>
             <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-white/15 bg-white/[0.035] px-4 py-6 text-sm text-muted-foreground transition-colors hover:border-[var(--rosso)]/40">
               <Camera className="size-5" />
               {photoUrl ? "Photo selected" : "Tap to upload"}
@@ -167,4 +178,24 @@ export default function CheckInPage() {
       </Card>
     </div>
   );
+}
+
+async function compressPhoto(file: File): Promise<string> {
+  const image = await createImageBitmap(file, {
+    imageOrientation: "from-image",
+  });
+  const maxSide = 900;
+  const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+  const width = Math.round(image.width * scale);
+  const height = Math.round(image.height * scale);
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Canvas unavailable");
+  context.drawImage(image, 0, 0, width, height);
+  image.close();
+
+  return canvas.toDataURL("image/jpeg", 0.72);
 }
