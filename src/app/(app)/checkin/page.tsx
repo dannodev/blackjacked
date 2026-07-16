@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { toast } from "sonner";
 import { useStore } from "@/lib/store";
+import { makeId } from "@/lib/id";
 import type { WeightLog } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,7 +42,7 @@ export default function CheckInPage() {
       return;
     }
     const log: WeightLog = {
-      id: crypto.randomUUID(),
+      id: makeId(),
       weight_kg: weight,
       waist_cm: typeof waist === "number" ? waist : undefined,
       chest_cm: typeof chest === "number" ? chest : undefined,
@@ -61,18 +63,19 @@ export default function CheckInPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div>
-        <h1 className="font-heading text-2xl font-bold">Weekly check-in</h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--rosso-light)]">Progress</p>
+        <h1 className="font-heading text-3xl font-extrabold">Weekly check-in</h1>
+        <p className="text-sm font-medium text-muted-foreground">
           Track your progress. Measurements are optional.
         </p>
       </div>
 
-      <Card className="rounded-2xl border-white/5 bg-card/60 backdrop-blur-xl">
+      <Card className="premium-panel rounded-[1.6rem]">
         <CardHeader>
-          <CardTitle className="font-heading text-base flex items-center gap-2">
-            <Scale className="size-4 text-[var(--rosso)]" />
+          <CardTitle className="font-heading flex items-center gap-2 text-base">
+            <Scale className="size-4 text-[var(--rosso-light)]" />
             This week
           </CardTitle>
         </CardHeader>
@@ -137,23 +140,26 @@ export default function CheckInPage() {
           {/* photo */}
           <div className="space-y-2">
             <Label className="text-xs">Progress photo (optional)</Label>
-            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-white/15 px-4 py-6 text-sm text-muted-foreground transition-colors hover:border-[var(--rosso)]/40">
+            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-white/15 bg-white/[0.035] px-4 py-6 text-sm text-muted-foreground transition-colors hover:border-[var(--rosso)]/40">
               <Camera className="size-5" />
               {photoUrl ? "Photo selected" : "Tap to upload"}
               <input type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
             </label>
             {photoUrl && (
-              <img
-                src={photoUrl}
-                alt="Progress"
-                className="h-32 w-full rounded-xl object-cover"
-              />
+              <div className="relative h-32 w-full">
+                <Image
+                  src={photoUrl}
+                  alt="Progress"
+                  fill
+                  className="rounded-2xl object-cover"
+                />
+              </div>
             )}
           </div>
 
           <Button
             onClick={save}
-            className="w-full bg-[var(--rosso)] text-white font-semibold hover:bg-[var(--rosso)]/90"
+            className="w-full bg-[var(--rosso)] font-semibold text-white hover:bg-[var(--rosso)]/90"
           >
             Save check-in
           </Button>

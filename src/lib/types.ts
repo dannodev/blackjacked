@@ -4,6 +4,7 @@ export type MealType = "breakfast" | "lunch" | "dinner" | "snack";
 export type ExerciseCategory =
   | "cardio"
   | "gym"
+  | "calisthenics"
   | "sports"
   | "daily"
   | "core";

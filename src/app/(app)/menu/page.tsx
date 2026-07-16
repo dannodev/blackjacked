@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
+import Link from "next/link";
 import { aiMenuPlan, type AIMenuPlan } from "@/lib/ai";
 import { MENU_PDF_TEXT } from "@/lib/menu-data";
 import { useStore } from "@/lib/store";
@@ -13,7 +14,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Sparkles, Loader2, Utensils } from "lucide-react";
+import { Sparkles, Loader2, Utensils, ChefHat, ArrowRight } from "lucide-react";
 
 export default function MenuPage() {
   const profile = useStore((s) => s.profile)!;
@@ -41,23 +42,43 @@ export default function MenuPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-bold">Weekly menu</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--rosso-light)]">Fuel plan</p>
+          <h1 className="font-heading text-3xl font-extrabold">Weekly menu</h1>
+          <p className="text-sm font-medium text-muted-foreground">
             From your Mexican PDF menu · {profile.calorie_goal} kcal target
           </p>
         </div>
         <div className="text-right">
           <p className="text-xs text-muted-foreground">AI tokens today</p>
-          <p className="font-heading text-sm font-bold text-[var(--rosso)]">
+          <p className="font-heading text-sm font-bold text-[var(--rosso-light)]">
             {aiTokens}
           </p>
         </div>
       </div>
 
-      <Card className="rounded-2xl border-white/5 bg-card/60 backdrop-blur-xl">
+      <Link href="/recipes" className="block">
+        <Card className="carbon-card rounded-[1.5rem] border-white/7">
+          <CardContent className="flex items-center justify-between gap-3 py-4">
+            <div className="flex items-center gap-3">
+              <div className="flex size-11 items-center justify-center rounded-2xl bg-[var(--rosso)]/12 text-[var(--rosso-light)]">
+                <ChefHat className="size-5" />
+              </div>
+              <div>
+                <p className="font-heading text-sm font-bold">Recipes</p>
+                <p className="text-xs text-muted-foreground">
+                  Save and reuse your go-to meals
+                </p>
+              </div>
+            </div>
+            <ArrowRight className="size-4 text-muted-foreground" />
+          </CardContent>
+        </Card>
+      </Link>
+
+      <Card className="premium-panel rounded-[1.6rem]">
         <CardContent className="space-y-3 py-4">
           <p className="text-sm text-muted-foreground">
             Gemini builds a 7-day plan from your menu PDF with these rules:
@@ -71,7 +92,7 @@ export default function MenuPage() {
           <Button
             onClick={generate}
             disabled={loading}
-            className="w-full bg-[var(--rosso)] text-white font-semibold hover:bg-[var(--rosso)]/90"
+            className="w-full bg-[var(--rosso)] font-semibold text-white hover:bg-[var(--rosso)]/90"
           >
             {loading ? (
               <>
@@ -102,11 +123,11 @@ export default function MenuPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.05 }}
               >
-                <Card className="rounded-2xl border-white/5 bg-card/60 backdrop-blur-xl">
+                <Card className="carbon-card rounded-[1.5rem] border-white/7">
                   <CardHeader className="pb-3">
                     <CardTitle className="font-heading text-base flex items-center justify-between">
                       <span>{day.day}</span>
-                      <span className="text-sm font-bold text-[var(--rosso)]">
+                      <span className="text-sm font-bold text-[var(--rosso-light)]">
                         ~{day.est_kcal} kcal
                       </span>
                     </CardTitle>

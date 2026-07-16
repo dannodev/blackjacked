@@ -20,8 +20,6 @@ export const EXERCISES: Exercise[] = [
   { id: "squat", name: "Squats", category: "gym", mets: 5.0 },
   { id: "deadlift", name: "Deadlift", category: "gym", mets: 6.0 },
   { id: "bench", name: "Bench press", category: "gym", mets: 5.0 },
-  { id: "pullup", name: "Pull-ups", category: "gym", mets: 8.0 },
-  { id: "pushup", name: "Push-ups", category: "gym", mets: 8.0 },
   { id: "plank", name: "Plank", category: "core", mets: 4.0 },
   { id: "ohp", name: "Overhead press", category: "gym", mets: 5.0 },
   { id: "lunge", name: "Lunges", category: "gym", mets: 5.5 },
@@ -42,6 +40,18 @@ export const EXERCISES: Exercise[] = [
   { id: "chestfly", name: "Cable fly", category: "gym", mets: 4.0 },
   { id: "shrug", name: "Shrug", category: "gym", mets: 3.5 },
   { id: "hyperext", name: "Hyperextension", category: "gym", mets: 4.0 },
+
+  // Calisthenics
+  { id: "pullup", name: "Pull-ups", category: "calisthenics", mets: 8.0 },
+  { id: "pushup", name: "Push-ups", category: "calisthenics", mets: 8.0 },
+  { id: "dip", name: "Dips", category: "calisthenics", mets: 8.0 },
+  { id: "bodyweightsquat", name: "Bodyweight squats", category: "calisthenics", mets: 5.0 },
+  { id: "burpee", name: "Burpees", category: "calisthenics", mets: 8.0 },
+  { id: "muscleup", name: "Muscle-ups", category: "calisthenics", mets: 9.0 },
+  { id: "handstandpushup", name: "Handstand push-ups", category: "calisthenics", mets: 8.0 },
+  { id: "invertedrow", name: "Inverted rows", category: "calisthenics", mets: 6.0 },
+  { id: "jumpingsquat", name: "Jump squats", category: "calisthenics", mets: 7.5 },
+  { id: "pistol", name: "Pistol squats", category: "calisthenics", mets: 6.5 },
 
   // Core
   { id: "crunch", name: "Crunch", category: "core", mets: 4.5 },
@@ -101,6 +111,7 @@ export const EXERCISES: Exercise[] = [
 export const CATEGORY_LABELS: Record<string, string> = {
   cardio: "Cardio",
   gym: "Gym",
+  calisthenics: "Calisthenics",
   sports: "Sports",
   core: "Core",
   daily: "Daily",

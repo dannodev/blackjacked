@@ -4,9 +4,10 @@ import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useStore, useAllFoods } from "@/lib/store";
+import { makeId } from "@/lib/id";
 import type { FoodItem, Meal, MealItem, MealType } from "@/lib/types";
 import { MEAL_LABELS } from "@/lib/types";
-import { MENU_MEAL_PRESETS, getTodayMeals, type MenuMealPreset } from "@/lib/menu-meals";
+import { MENU_MEAL_PRESETS, type MenuMealPreset } from "@/lib/menu-meals";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -33,15 +34,16 @@ function inferMealType(): MealType {
 }
 
 type SubTab = "menu" | "search" | "custom";
+const MENU_DAYS = ["All", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 export function FoodLog() {
   const [subtab, setSubtab] = useState<SubTab>("menu");
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-1.5 rounded-2xl bg-white/5 p-1">
+      <div className="flex gap-1.5 rounded-full border border-white/8 bg-black/35 p-1">
         <SubTabBtn active={subtab === "menu"} onClick={() => setSubtab("menu")} icon={<Utensils className="size-3.5" />}>
-          Today&apos;s Menu
+          Menu PDF
         </SubTabBtn>
         <SubTabBtn active={subtab === "search"} onClick={() => setSubtab("search")}>
           Search Foods
@@ -69,9 +71,9 @@ function SubTabBtn({
     <button
       onClick={onClick}
       className={cn(
-        "flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-semibold transition-all",
+        "flex flex-1 items-center justify-center gap-1.5 rounded-full py-2 text-xs font-semibold transition-all",
         active
-          ? "bg-[var(--rosso)] text-white shadow-sm"
+          ? "bg-white text-black shadow-sm"
           : "text-muted-foreground hover:text-foreground",
       )}
     >
@@ -85,12 +87,21 @@ function SubTabBtn({
 function MenuMealsLog() {
   const addMeal = useStore((s) => s.addMeal);
   const profile = useStore((s) => s.profile)!;
-  const todayMeals = getTodayMeals();
   const [logged, setLogged] = useState<Set<string>>(new Set());
+  const [dayFilter, setDayFilter] = useState("All");
+  const [mealFilter, setMealFilter] = useState<MealType | "all">("all");
+
+  const menuMeals = useMemo(() => {
+    return MENU_MEAL_PRESETS.filter((meal) => {
+      const matchesDay = dayFilter === "All" || meal.day === dayFilter;
+      const matchesMeal = mealFilter === "all" || meal.type === mealFilter;
+      return matchesDay && matchesMeal;
+    });
+  }, [dayFilter, mealFilter]);
 
   function logPreset(preset: MenuMealPreset) {
     const meal: Meal = {
-      id: crypto.randomUUID(),
+      id: makeId(),
       type: preset.type,
       loggedAt: nowTime(),
       total_kcal: preset.kcal,
@@ -117,15 +128,15 @@ function MenuMealsLog() {
     });
   }
 
-  if (todayMeals.length === 0) {
+  if (MENU_MEAL_PRESETS.length === 0) {
     return (
-      <Card className="rounded-2xl border-dashed border-white/10 bg-card/40">
+      <Card className="rounded-[1.6rem] border-dashed border-white/10 bg-white/[0.035]">
         <CardContent className="flex flex-col items-center gap-3 py-8 text-center">
-          <div className="flex size-12 items-center justify-center rounded-2xl bg-[var(--rosso)]/10 text-[var(--rosso)]">
+          <div className="flex size-12 items-center justify-center rounded-2xl bg-[var(--rosso)]/12 text-[var(--rosso-light)]">
             <Utensils className="size-6" />
           </div>
           <p className="max-w-xs text-sm text-muted-foreground">
-            No meals mapped for today in your weekly menu. Check back tomorrow or use the Search tab.
+            No meals mapped from your weekly PDF yet. Use the Search tab for now.
           </p>
         </CardContent>
       </Card>
@@ -136,13 +147,47 @@ function MenuMealsLog() {
     <div className="space-y-2">
       <div className="mb-1 flex items-center justify-between">
         <p className="text-xs uppercase tracking-wide text-muted-foreground">
-          {todayMeals[0]?.day ?? "Today"}
+          {dayFilter === "All" ? "All PDF meals" : dayFilter}
         </p>
         <p className="text-xs text-muted-foreground">
           Goal: {profile.calorie_goal} kcal
         </p>
       </div>
-      {todayMeals.map((preset) => {
+      <div className="flex gap-1.5 overflow-x-auto pb-1">
+        {MENU_DAYS.map((day) => (
+          <button
+            key={day}
+            type="button"
+            onClick={() => setDayFilter(day)}
+            className={cn(
+              "shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+              dayFilter === day
+                ? "border-[var(--rosso)] bg-[var(--rosso)]/12 text-[var(--rosso-light)]"
+                : "border-white/10 text-muted-foreground",
+            )}
+          >
+            {day}
+          </button>
+        ))}
+      </div>
+      <div className="grid grid-cols-5 gap-1.5">
+        {(["all", ...MEAL_TYPES] as const).map((mealType) => (
+          <button
+            key={mealType}
+            type="button"
+            onClick={() => setMealFilter(mealType)}
+            className={cn(
+              "rounded-full border px-1 py-1.5 text-[10px] font-semibold transition-colors",
+              mealFilter === mealType
+                ? "border-[var(--rosso)] bg-[var(--rosso)]/12 text-[var(--rosso-light)]"
+                : "border-white/10 text-muted-foreground",
+            )}
+          >
+            {mealType === "all" ? "All" : MEAL_LABELS[mealType]}
+          </button>
+        ))}
+      </div>
+      {menuMeals.map((preset) => {
         const isLogged = logged.has(preset.id);
         return (
           <motion.div
@@ -152,26 +197,26 @@ function MenuMealsLog() {
           >
             <Card
               className={cn(
-                "overflow-hidden rounded-2xl border-white/5 transition-all",
+                "overflow-hidden rounded-[1.35rem] border-white/7 transition-all",
                 isLogged
                   ? "bg-[var(--rosso)]/5 opacity-60"
-                  : "bg-card/60 backdrop-blur-xl",
+                  : "carbon-card",
               )}
             >
               <CardContent className="flex items-center gap-3 py-3.5">
-                <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-white/5 text-2xl">
+                <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-white/[0.055] text-2xl">
                   {preset.emoji}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <p className="truncate text-sm font-semibold">{preset.name}</p>
-                    {isLogged && <Check className="size-4 text-[var(--rosso)]" />}
+                    {isLogged && <Check className="size-4 text-[var(--rosso-light)]" />}
                   </div>
                   <p className="truncate text-xs text-muted-foreground">
-                    {preset.description}
+                    {preset.day} · {preset.meal_slot} · {preset.description}
                   </p>
                   <p className="mt-0.5 text-xs">
-                    <span className="font-heading font-bold text-[var(--rosso)]">{preset.kcal}</span>
+                    <span className="font-heading font-bold text-[var(--rosso-light)]">{preset.kcal}</span>
                     <span className="text-muted-foreground"> kcal · </span>
                     <span className="text-muted-foreground">P{preset.protein_g}g C{preset.carb_g}g F{preset.fat_g}g</span>
                   </p>
@@ -180,7 +225,7 @@ function MenuMealsLog() {
                   <motion.button
                     whileTap={{ scale: 0.9 }}
                     onClick={() => logPreset(preset)}
-                    className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--rosso)] text-white"
+                    className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--rosso)] text-white rosso-glow"
                     aria-label="Log meal"
                   >
                     <Plus className="size-5" strokeWidth={2.5} />
@@ -191,6 +236,11 @@ function MenuMealsLog() {
           </motion.div>
         );
       })}
+      {menuMeals.length === 0 && (
+        <p className="py-6 text-center text-sm text-muted-foreground">
+          No meals match those filters.
+        </p>
+      )}
     </div>
   );
 }
@@ -268,7 +318,7 @@ function SearchFoodsLog() {
       };
     });
     const meal: Meal = {
-      id: crypto.randomUUID(),
+      id: makeId(),
       type: mealType,
       loggedAt: nowTime(),
       total_kcal: Math.round(cartTotals.kcal),
@@ -293,9 +343,9 @@ function SearchFoodsLog() {
             type="button"
             onClick={() => setMealType(mt)}
             className={cn(
-              "rounded-xl border px-1 py-2 text-xs font-medium transition-colors",
+              "rounded-full border px-1 py-2 text-xs font-semibold transition-colors",
               mealType === mt
-                ? "border-[var(--rosso)] bg-[var(--rosso)]/10 text-[var(--rosso)]"
+                ? "border-[var(--rosso)] bg-[var(--rosso)]/12 text-[var(--rosso-light)]"
                 : "border-white/10 text-muted-foreground",
             )}
           >
@@ -320,7 +370,7 @@ function SearchFoodsLog() {
             key={f.id}
             type="button"
             onClick={() => add(f)}
-            className="flex w-full items-center justify-between rounded-xl border border-white/5 bg-card/50 px-3 py-2.5 text-left transition-colors hover:bg-card/80"
+            className="flex w-full items-center justify-between rounded-2xl border border-white/7 bg-white/[0.045] px-3 py-2.5 text-left transition-colors hover:bg-white/[0.075]"
           >
             <div className="min-w-0">
               <p className="truncate text-sm font-medium">{f.name}</p>
@@ -330,7 +380,7 @@ function SearchFoodsLog() {
                 {f.fat_g}
               </p>
             </div>
-            <Plus className="size-4 text-[var(--rosso)]" />
+            <Plus className="size-4 text-[var(--rosso-light)]" />
           </button>
         ))}
         {results.length === 0 && (
@@ -345,7 +395,7 @@ function SearchFoodsLog() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <Card className="rounded-2xl border-white/5 bg-card/60 backdrop-blur-xl">
+          <Card className="premium-panel rounded-[1.6rem]">
             <CardHeader>
               <CardTitle className="font-heading text-base">
                 {MEAL_LABELS[mealType]} · {Math.round(cartTotals.kcal)} kcal
@@ -355,7 +405,7 @@ function SearchFoodsLog() {
               {cart.map(({ item, qty }) => (
                 <div
                   key={item.id}
-                  className="flex items-center gap-2 rounded-lg bg-white/5 px-2 py-2"
+                  className="flex items-center gap-2 rounded-2xl bg-white/[0.05] px-2 py-2"
                 >
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm">{item.name}</p>
@@ -382,7 +432,7 @@ function SearchFoodsLog() {
               ))}
               <Button
                 onClick={save}
-                className="w-full bg-[var(--rosso)] text-white font-semibold hover:bg-[var(--rosso)]/90"
+                className="w-full bg-[var(--rosso)] font-semibold text-white hover:bg-[var(--rosso)]/90"
               >
                 Log {MEAL_LABELS[mealType].toLowerCase()}
               </Button>

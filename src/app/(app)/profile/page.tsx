@@ -66,14 +66,15 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div className="flex items-center gap-3">
-        <div className="flex size-14 items-center justify-center rounded-2xl bg-[var(--rosso)]/10 text-[var(--rosso)] font-heading text-xl font-bold">
+        <div className="flex size-14 items-center justify-center rounded-2xl bg-[var(--rosso)]/12 font-heading text-xl font-extrabold text-[var(--rosso-light)]">
           {user?.name.slice(0, 2).toUpperCase()}
         </div>
         <div>
-          <h1 className="font-heading text-xl font-bold">{user?.name}</h1>
-          <p className="text-sm text-muted-foreground">{user?.email}</p>
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--rosso-light)]">Profile</p>
+          <h1 className="font-heading text-2xl font-extrabold">{user?.name}</h1>
+          <p className="text-sm font-medium text-muted-foreground">{user?.email}</p>
         </div>
       </div>
 
@@ -82,7 +83,7 @@ export default function ProfilePage() {
         <Stat label="Best streak" value={`${streaks.longest_streak}`} />
       </div>
 
-      <Card className="rounded-2xl border-white/5 bg-card/60 backdrop-blur-xl">
+      <Card className="carbon-card rounded-[1.5rem] border-white/7">
         <CardHeader>
           <CardTitle className="font-heading text-base">Your stats</CardTitle>
         </CardHeader>
@@ -94,10 +95,10 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
-      <Card className="rounded-2xl border-white/5 bg-card/60 backdrop-blur-xl">
+      <Card className="premium-panel rounded-[1.5rem]">
         <CardHeader>
           <CardTitle className="font-heading text-base flex items-center gap-2">
-            <Bolt className="size-4 text-[var(--rosso)]" />
+            <Bolt className="size-4 text-[var(--rosso-light)]" />
             Daily targets
           </CardTitle>
         </CardHeader>
@@ -112,11 +113,12 @@ export default function ProfilePage() {
       <div className="space-y-2">
         <button
           onClick={toggleReminders}
-          className="flex w-full items-center justify-between rounded-2xl border border-white/5 bg-card/60 px-4 py-3 backdrop-blur-xl"
+          aria-label={remindersOn ? "Disable reminders" : "Enable reminders"}
+          className="flex w-full items-center justify-between rounded-[1.35rem] border border-white/7 bg-white/[0.045] px-4 py-3 backdrop-blur-xl"
         >
           <div className="flex items-center gap-2">
             {remindersOn ? (
-              <Bell className="size-4 text-[var(--rosso)]" />
+              <Bell className="size-4 text-[var(--rosso-light)]" />
             ) : (
               <BellOff className="size-4 text-muted-foreground" />
             )}
@@ -126,7 +128,7 @@ export default function ProfilePage() {
             className={
               "rounded-full px-2 py-0.5 text-xs font-medium " +
               (remindersOn
-                ? "bg-[var(--rosso)]/15 text-[var(--rosso)]"
+                ? "bg-[var(--rosso)]/15 text-[var(--rosso-light)]"
                 : "bg-white/5 text-muted-foreground")
             }
           >
@@ -181,15 +183,15 @@ function Stat({
   accent?: boolean;
 }) {
   return (
-    <Card className="rounded-2xl border-white/5 bg-card/60 backdrop-blur-xl">
+    <Card className="carbon-card rounded-[1.35rem] border-white/7">
       <CardContent className="py-4">
         <p className="text-xs uppercase tracking-wide text-muted-foreground">
           {label}
         </p>
         <p
           className={
-            "font-heading text-2xl font-bold " +
-            (accent ? "text-[var(--rosso)]" : "")
+            "font-heading text-2xl font-extrabold " +
+            (accent ? "text-[var(--rosso-light)]" : "")
           }
         >
           {value}

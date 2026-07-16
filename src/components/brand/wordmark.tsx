@@ -1,25 +1,17 @@
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 
-export function Bolt({
-  className,
-  strokeWidth = 2,
-}: {
-  className?: string;
-  strokeWidth?: number;
-}) {
+export function BlackjackMark({ className }: { className?: string }) {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={strokeWidth}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
+    <Image
+      src="/blackjacked-logo.png"
+      alt=""
+      width={96}
+      height={96}
+      className={cn("inline-block object-contain", className)}
       aria-hidden
-    >
-      <path d="M13 2 4.5 13.5h6L11 22l8.5-11.5h-6L13 2Z" fill="currentColor" stroke="none" />
-    </svg>
+      priority
+    />
   );
 }
 
@@ -39,7 +31,7 @@ export function Wordmark({
       )}
     >
       Blac
-      <Bolt className="mx-[0.04em] -my-[0.05em] h-[0.85em] w-[0.85em] text-[var(--rosso)]" strokeWidth={2.5} />
+      <BlackjackMark className="mx-[0.08em] -my-[0.18em] h-[1.22em] w-[1.22em]" />
       Jacked
     </span>
   );

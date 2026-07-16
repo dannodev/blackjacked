@@ -17,6 +17,7 @@ import type {
 } from "./types";
 import { todayKey } from "./types";
 import { FOODS } from "./foods-seed";
+import { makeId } from "./id";
 
 const DB_KEY = "blackjacked-store-v1";
 
@@ -136,7 +137,7 @@ export const useStore = create<State>()(
       createSquad: (name) =>
         set({
           squad: {
-            id: crypto.randomUUID(),
+            id: makeId(),
             name,
             members: [],
             createdAt: new Date().toISOString(),
@@ -147,7 +148,7 @@ export const useStore = create<State>()(
         set((s) => {
           if (!s.squad) return {};
           if (s.squad.members.length >= 6) return {};
-          const member: SquadMember = { ...m, id: crypto.randomUUID() };
+          const member: SquadMember = { ...m, id: makeId() };
           return { squad: { ...s.squad, members: [...s.squad.members, member] } };
         }),
 

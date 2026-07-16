@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { aiFoodBreakdown, type AIFoodResult } from "@/lib/ai";
 import { useStore } from "@/lib/store";
+import { makeId } from "@/lib/id";
 import type { Meal, MealItem, MealType } from "@/lib/types";
 import { MEAL_LABELS } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -46,7 +47,7 @@ export function AiFoodLog() {
   function confirm() {
     if (!result) return;
     const items: MealItem[] = result.ingredients.map((ing) => ({
-      food_item_id: crypto.randomUUID(),
+      food_item_id: makeId(),
       name: ing.name,
       quantity: ing.quantity,
       unit: ing.unit,
@@ -56,7 +57,7 @@ export function AiFoodLog() {
       carb_g: +ing.carb_g.toFixed(1),
     }));
     const meal: Meal = {
-      id: crypto.randomUUID(),
+      id: makeId(),
       type: mealType,
       loggedAt: new Date().toISOString(),
       total_kcal: result.total_kcal,
@@ -82,9 +83,9 @@ export function AiFoodLog() {
             type="button"
             onClick={() => setMealType(mt)}
             className={cn(
-              "rounded-xl border px-1 py-2 text-xs font-medium capitalize transition-colors",
+              "rounded-full border px-1 py-2 text-xs font-semibold capitalize transition-colors",
               mealType === mt
-                ? "border-[var(--rosso)] bg-[var(--rosso)]/10 text-[var(--rosso)]"
+                ? "border-[var(--rosso)] bg-[var(--rosso)]/12 text-[var(--rosso-light)]"
                 : "border-white/10 text-muted-foreground",
             )}
           >
@@ -93,9 +94,9 @@ export function AiFoodLog() {
         ))}
       </div>
 
-      <Card className="rounded-2xl border-white/5 bg-card/60 backdrop-blur-xl">
+      <Card className="premium-panel rounded-[1.6rem]">
         <CardContent className="space-y-3 py-4">
-          <div className="flex items-center gap-2 text-sm text-[var(--rosso)]">
+          <div className="flex items-center gap-2 text-sm text-[var(--rosso-light)]">
             <Sparkles className="size-4" />
             <span className="font-medium">Describe your meal in plain words</span>
           </div>
@@ -103,12 +104,12 @@ export function AiFoodLog() {
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="e.g. 2 eggs with spinach and 2 tortillas, plus a banana"
-            className="min-h-20 w-full resize-none rounded-xl border border-white/10 bg-background/60 px-3 py-2.5 text-sm outline-none focus:border-[var(--rosso)]"
+            className="min-h-24 w-full resize-none rounded-2xl border border-white/10 bg-white/[0.045] px-3.5 py-3 text-sm outline-none focus:border-[var(--rosso)]"
           />
           <Button
             onClick={analyze}
             disabled={loading}
-            className="w-full bg-[var(--rosso)] text-white font-semibold hover:bg-[var(--rosso)]/90"
+            className="w-full bg-[var(--rosso)] font-semibold text-white hover:bg-[var(--rosso)]/90"
           >
             {loading ? (
               <>
@@ -132,11 +133,11 @@ export function AiFoodLog() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -12 }}
           >
-            <Card className="rounded-2xl border-white/5 bg-card/60 backdrop-blur-xl">
+            <Card className="carbon-card rounded-[1.6rem] border-white/7">
               <CardHeader>
-                <CardTitle className="font-heading text-base flex items-center justify-between">
+                <CardTitle className="font-heading flex items-center justify-between text-base">
                   <span>Confirm before saving</span>
-                  <span className="font-heading text-xl font-bold text-[var(--rosso)]">
+                  <span className="font-heading text-xl font-bold text-[var(--rosso-light)]">
                     {result.total_kcal} kcal
                   </span>
                 </CardTitle>
@@ -145,7 +146,7 @@ export function AiFoodLog() {
                 {result.ingredients.map((ing, i) => (
                   <div
                     key={i}
-                    className="flex items-center justify-between rounded-lg bg-white/5 px-3 py-2 text-sm"
+                    className="flex items-center justify-between rounded-2xl bg-white/[0.05] px-3 py-2 text-sm"
                   >
                     <span>{ing.name}</span>
                     <span className="text-muted-foreground">
@@ -164,7 +165,7 @@ export function AiFoodLog() {
                     Discard
                   </Button>
                   <Button
-                    className="flex-1 bg-[var(--rosso)] text-white font-semibold hover:bg-[var(--rosso)]/90"
+                    className="flex-1 bg-[var(--rosso)] font-semibold text-white hover:bg-[var(--rosso)]/90"
                     onClick={confirm}
                   >
                     <Check className="mr-1 size-4" />

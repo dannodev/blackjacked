@@ -28,8 +28,9 @@ export const metadata: Metadata = {
   },
   formatDetection: { telephone: false },
   icons: {
-    icon: "/icon.svg",
-    apple: "/icon.svg",
+    icon: "/blackjacked-logo.png",
+    shortcut: "/blackjacked-logo.png",
+    apple: "/blackjacked-logo.png",
   },
 };
 

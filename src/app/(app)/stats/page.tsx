@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useMemo } from "react";
 import {
   ResponsiveContainer,
@@ -78,27 +79,27 @@ export default function StatsPage() {
     : 0;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div>
-        <h1 className="font-heading text-2xl font-bold">Stats</h1>
-        <p className="text-sm text-muted-foreground">
+        <h1 className="font-heading text-3xl font-extrabold">Stats</h1>
+        <p className="text-sm font-medium text-muted-foreground">
           Weight trends and daily deficit overlay
         </p>
       </div>
 
       {/* weight trend */}
-      <Card className="rounded-2xl border-white/5 bg-card/60 backdrop-blur-xl">
+      <Card className="premium-panel chart-grid rounded-[1.6rem]">
         <CardHeader>
-          <CardTitle className="font-heading text-base flex items-center justify-between">
+          <CardTitle className="font-heading flex items-center justify-between text-base">
             <span className="flex items-center gap-2">
-              <Scale className="size-4 text-[var(--rosso)]" />
+              <Scale className="size-4 text-[var(--rosso-light)]" />
               Weight trend
             </span>
             {weightChange !== 0 && (
               <span
                 className={
                   "text-sm font-bold " +
-                  (weightChange < 0 ? "text-[var(--rosso)]" : "text-[var(--amber)]")
+                  (weightChange < 0 ? "text-[var(--rosso-light)]" : "text-[var(--amber)]")
                 }
               >
                 {weightChange > 0 ? "+" : ""}
@@ -124,9 +125,9 @@ export default function StatsPage() {
                 <YAxis stroke="var(--muted-foreground)" fontSize={11} domain={["auto", "auto"]} />
                 <Tooltip
                   contentStyle={{
-                    background: "var(--card)",
+                    background: "var(--panel-soft)",
                     border: "1px solid rgba(255,255,255,0.1)",
-                    borderRadius: 12,
+                    borderRadius: 18,
                     fontSize: 12,
                   }}
                 />
@@ -144,10 +145,10 @@ export default function StatsPage() {
       </Card>
 
       {/* deficit overlay */}
-      <Card className="rounded-2xl border-white/5 bg-card/60 backdrop-blur-xl">
+      <Card className="premium-panel chart-grid rounded-[1.6rem]">
         <CardHeader>
-          <CardTitle className="font-heading text-base flex items-center gap-2">
-            <TrendingDown className="size-4 text-[var(--rosso)]" />
+          <CardTitle className="font-heading flex items-center gap-2 text-base">
+            <TrendingDown className="size-4 text-[var(--rosso-light)]" />
             7-day deficit
           </CardTitle>
         </CardHeader>
@@ -159,16 +160,16 @@ export default function StatsPage() {
               <YAxis stroke="var(--muted-foreground)" fontSize={11} />
               <Tooltip
                 contentStyle={{
-                  background: "var(--card)",
+                  background: "var(--panel-soft)",
                   border: "1px solid rgba(255,255,255,0.1)",
-                  borderRadius: 12,
+                  borderRadius: 18,
                   fontSize: 12,
                 }}
               />
               <Bar
                 dataKey="goal_deficit"
                 fill="var(--rosso)"
-                radius={[4, 4, 0, 0]}
+                radius={[8, 8, 0, 0]}
                 opacity={0.6}
                 name="Goal deficit"
               />
@@ -200,7 +201,7 @@ export default function StatsPage() {
       </Card>
 
       {/* progress photos */}
-      <Card className="rounded-2xl border-white/5 bg-card/60 backdrop-blur-xl">
+      <Card className="carbon-card rounded-[1.6rem] border-white/7">
         <CardHeader>
           <CardTitle className="font-heading text-base">Progress photos</CardTitle>
         </CardHeader>
@@ -215,11 +216,12 @@ export default function StatsPage() {
                 .reverse()
                 .filter((w) => w.photo_url)
                 .map((w) => (
-                  <div key={w.id} className="shrink-0">
-                    <img
-                      src={w.photo_url}
+                  <div key={w.id} className="relative shrink-0 h-32 w-32">
+                    <Image
+                      src={w.photo_url!}
                       alt="Progress"
-                      className="h-32 w-32 rounded-2xl object-cover"
+                      fill
+                      className="rounded-[1.25rem] object-cover"
                     />
                     <p className="mt-1 text-center text-xs text-muted-foreground">
                       {new Date(w.loggedAt).toLocaleDateString(undefined, {

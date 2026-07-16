@@ -1,8 +1,27 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
+const appRoutes = [
+  "/checkin",
+  "/dashboard",
+  "/log",
+  "/menu",
+  "/profile",
+  "/recipes",
+  "/squad",
+  "/stats",
+  "/workouts",
+];
+
+const authRoutes = ["/login", "/signup"];
+
+function matchesRoute(pathname: string, routes: string[]) {
+  return routes.some((route) => pathname === route || pathname.startsWith(`${route}/`));
+}
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
+  const { pathname } = request.nextUrl;
 
   // Skip if Supabase is not configured
   if (
@@ -39,7 +58,29 @@ export async function updateSession(request: NextRequest) {
   //
   // IMPORTANT: supabase.auth.getClaims() is the recommended way to
   // protect pages. See the "Core Principles" in the Supabase docs.
-  await supabase.auth.getClaims();
+  const { data, error } = await supabase.auth.getClaims();
+  const isSignedIn = Boolean(data?.claims?.sub && !error);
+
+  if (!isSignedIn && (matchesRoute(pathname, appRoutes) || pathname === "/onboarding")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.searchParams.set("next", pathname);
+    return NextResponse.redirect(url);
+  }
+
+  if (isSignedIn && matchesRoute(pathname, authRoutes)) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/dashboard";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
+
+  if (pathname === "/") {
+    const url = request.nextUrl.clone();
+    url.pathname = isSignedIn ? "/dashboard" : "/login";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
 
   return supabaseResponse;
 }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Plus, BarChart3, User, LogOut, Utensils, ChefHat, Users } from "lucide-react";
+import { Home, Plus, BarChart3, User, LogOut, Utensils, Dumbbell, Users, Bell } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/lib/auth";
 import { Wordmark } from "@/components/brand/wordmark";
@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -22,7 +23,7 @@ const nav = [
   { href: "/menu", label: "Menu", icon: Utensils },
   { href: "/stats", label: "Stats", icon: BarChart3 },
   { href: "/squad", label: "Squad", icon: Users },
-  { href: "/recipes", label: "Recipes", icon: ChefHat },
+  { href: "/workouts", label: "Workouts", icon: Dumbbell },
   { href: "/profile", label: "Profile", icon: User },
 ];
 
@@ -33,56 +34,72 @@ function initials(name: string) {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, signOut } = useAuth();
+  const isLogPage = pathname === "/log" || pathname.startsWith("/log/");
+  const hideQuickLog = isLogPage || pathname === "/stats";
 
   return (
-    <div className="mx-auto flex min-h-[100dvh] max-w-md flex-col bg-background racing-stripe">
+    <div className="app-glow mx-auto flex min-h-[100dvh] max-w-md flex-col overflow-hidden bg-background shadow-[0_0_80px_rgba(0,0,0,0.55)] sm:border-x sm:border-white/8">
       {/* Sticky app bar */}
-      <header className="sticky top-0 z-40 flex items-center justify-between border-b border-white/5 bg-background/85 px-4 py-3 backdrop-blur-2xl">
+      <header className="sticky top-0 z-40 flex items-center justify-between border-b border-white/5 bg-background/72 px-4 py-3 backdrop-blur-2xl">
         <Link href="/dashboard" className="flex items-center">
           <Wordmark size="text-lg" />
         </Link>
-        <DropdownMenu>
-          <DropdownMenuTrigger className="rounded-full outline-none">
-            <Avatar className="size-9 border border-white/10 bg-[var(--rosso)]/10">
-              <AvatarFallback className="bg-transparent text-sm font-bold text-[var(--rosso)]">
-                {user ? initials(user.name) : "??"}
-              </AvatarFallback>
-            </Avatar>
-          </DropdownMenuTrigger>
+        <div className="flex items-center gap-2">
+          <button
+            aria-label="Notifications"
+            className="flex size-9 items-center justify-center rounded-full border border-white/8 bg-white/[0.045] text-muted-foreground"
+          >
+            <Bell className="size-4" />
+          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger className="rounded-full outline-none">
+              <Avatar className="size-9 border border-white/10 bg-[var(--rosso)]/12 shadow-[0_0_24px_rgba(244,63,63,0.12)]">
+                <AvatarFallback className="bg-transparent text-sm font-bold text-[var(--rosso-light)]">
+                  {user ? initials(user.name) : "??"}
+                </AvatarFallback>
+              </Avatar>
+            </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuLabel className="truncate">
-              {user?.email}
-            </DropdownMenuLabel>
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="truncate">
+                {user?.email}
+              </DropdownMenuLabel>
+            </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => signOut()} className="text-[var(--over)]">
               <LogOut className="mr-2 size-4" />
               Log out
             </DropdownMenuItem>
           </DropdownMenuContent>
-        </DropdownMenu>
+          </DropdownMenu>
+        </div>
       </header>
 
       {/* Page content */}
-      <main className="flex-1 px-4 pb-24 pt-4">{children}</main>
+      <main className="flex-1 px-4 pb-28 pt-4">{children}</main>
 
       {/* Log FAB */}
-      <Link
-        href="/log"
-        className="group fixed inset-x-0 bottom-[4.5rem] z-40 mx-auto flex w-fit items-center"
-        aria-label="Quick log"
-      >
-        <motion.span
-          whileTap={{ scale: 0.88 }}
-          className="flex h-13 w-13 items-center justify-center rounded-full bg-[var(--rosso)] text-white rosso-glow"
-          style={{ height: "3.25rem", width: "3.25rem" }}
-        >
-          <Plus className="size-7" strokeWidth={2.5} />
-        </motion.span>
-      </Link>
+      {!hideQuickLog && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-[4.8rem] z-40 mx-auto flex max-w-md justify-end pr-5">
+          <Link
+            href="/log"
+            className="group pointer-events-auto flex w-fit items-center"
+            aria-label="Quick log"
+          >
+            <motion.span
+              whileTap={{ scale: 0.88 }}
+              className="flex h-14 w-14 items-center justify-center rounded-full bg-[linear-gradient(145deg,var(--rosso-light),var(--rosso-dark))] text-white rosso-glow ring-4 ring-black/45"
+              style={{ height: "3.5rem", width: "3.5rem" }}
+            >
+              <Plus className="size-7" strokeWidth={2.5} />
+            </motion.span>
+          </Link>
+        </div>
+      )}
 
       {/* Bottom nav */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto max-w-md border-t border-white/5 bg-background/90 backdrop-blur-2xl">
-        <ul className="flex items-stretch justify-around px-1 pb-[env(safe-area-inset-bottom)]">
+      <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto max-w-md px-3 pb-3">
+        <ul className="flex items-stretch justify-around rounded-[1.6rem] border border-white/8 bg-black/72 px-1 pb-[env(safe-area-inset-bottom)] shadow-[0_18px_50px_rgba(0,0,0,0.5)] backdrop-blur-2xl">
           {nav.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(`${href}/`);
             return (
@@ -90,11 +107,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Link
                   href={href}
                   className={cn(
-                    "flex flex-col items-center gap-1 py-2 text-[10px] font-medium transition-colors",
-                    active ? "text-[var(--rosso)]" : "text-muted-foreground",
+                    "flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl py-2 text-[10px] font-semibold transition-colors",
+                    active ? "text-white" : "text-muted-foreground",
                   )}
                 >
-                  <Icon className="size-[18px]" strokeWidth={active ? 2.5 : 2} />
+                  <span
+                    className={cn(
+                      "flex size-7 items-center justify-center rounded-full transition-colors",
+                      active && "bg-[var(--rosso)] text-white shadow-[0_8px_22px_rgba(244,63,63,0.32)]",
+                    )}
+                  >
+                    <Icon className="size-[16px]" strokeWidth={active ? 2.5 : 2} />
+                  </span>
                   {label}
                 </Link>
               </li>

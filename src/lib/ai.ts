@@ -188,7 +188,8 @@ Data: ${ctx}`;
     const json = JSON.parse(result.response.text());
     trackTokens(Math.ceil(result.response.usageMetadata?.totalTokenCount ?? 80));
     return json as AIInsight;
-  } catch (e) {
+  } catch (error) {
+    console.warn("Gemini insight call failed, using mock", error);
     return { insight: mockInsight(ctx) };
   }
 }

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useStore } from "@/lib/store";
+import { makeId } from "@/lib/id";
 import { EXERCISES, CATEGORY_LABELS } from "@/lib/exercises-seed";
 import type { Exercise, ExerciseCategory, ExerciseLog } from "@/lib/types";
 import { activityKcal } from "@/lib/types";
@@ -24,6 +25,7 @@ const CATEGORIES: (ExerciseCategory | "all")[] = [
   "all",
   "cardio",
   "gym",
+  "calisthenics",
   "core",
   "sports",
   "daily",
@@ -65,15 +67,15 @@ export function ExerciseLogForm() {
       return;
     }
     const log: ExerciseLog = {
-      id: crypto.randomUUID(),
+      id: makeId(),
       exercise_id: selected.id,
       exercise_name: selected.name,
       category: selected.category,
       mets: selected.mets,
       duration_min: duration,
       distance_km: selected.distance_based ? distance || undefined : undefined,
-      reps: selected.category === "gym" || selected.category === "core" ? reps : undefined,
-      sets: selected.category === "gym" || selected.category === "core" ? sets : undefined,
+      reps: selected.category === "gym" || selected.category === "core" || selected.category === "calisthenics" ? reps : undefined,
+      sets: selected.category === "gym" || selected.category === "core" || selected.category === "calisthenics" ? sets : undefined,
       kcal_burned: kcal,
       loggedAt: new Date().toISOString(),
     };
@@ -126,9 +128,9 @@ export function ExerciseLogForm() {
             type="button"
             onClick={() => setCat(c)}
             className={cn(
-              "whitespace-nowrap rounded-full border px-3 py-1.5 text-xs capitalize transition-colors",
+              "whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold capitalize transition-colors",
               cat === c
-                ? "border-[var(--rosso)] bg-[var(--rosso)]/10 text-[var(--rosso)]"
+                ? "border-[var(--rosso)] bg-[var(--rosso)]/12 text-[var(--rosso-light)]"
                 : "border-white/10 text-muted-foreground",
             )}
           >
@@ -151,7 +153,7 @@ export function ExerciseLogForm() {
             variant="outline"
             onClick={aiMatch}
             disabled={aiLoading}
-            className="border-[var(--rosso)]/30 text-[var(--rosso)]"
+            className="border-[var(--rosso)]/30 text-[var(--rosso-light)]"
           >
             {aiLoading ? (
               <Loader2 className="size-4 animate-spin" />
@@ -178,14 +180,14 @@ export function ExerciseLogForm() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <Card className="rounded-2xl border-white/5 bg-card/60 backdrop-blur-xl">
+          <Card className="premium-panel rounded-[1.6rem]">
             <CardHeader>
               <CardTitle className="font-heading text-base">
                 {selected.name}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {(selected.category === "gym" || selected.category === "core") && (
+              {(selected.category === "gym" || selected.category === "core" || selected.category === "calisthenics") && (
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Sets">
                     <Input
@@ -221,9 +223,9 @@ export function ExerciseLogForm() {
                   />
                 </Field>
               )}
-              <div className="flex items-center justify-between rounded-xl bg-[var(--rosso)]/10 px-3 py-2.5">
+              <div className="flex items-center justify-between rounded-2xl bg-[var(--rosso)]/12 px-3 py-2.5">
                 <span className="text-sm">Estimated burn</span>
-                <span className="font-heading text-lg font-bold text-[var(--rosso)]">
+                <span className="font-heading text-lg font-bold text-[var(--rosso-light)]">
                   {Math.round(kcal)} kcal
                 </span>
               </div>
@@ -236,7 +238,7 @@ export function ExerciseLogForm() {
                   Cancel
                 </Button>
                 <Button
-                  className="flex-1 bg-[var(--rosso)] text-white font-semibold hover:bg-[var(--rosso)]/90"
+                  className="flex-1 bg-[var(--rosso)] font-semibold text-white hover:bg-[var(--rosso)]/90"
                   onClick={log}
                 >
                   Log it
@@ -252,7 +254,7 @@ export function ExerciseLogForm() {
               key={e.id}
               type="button"
               onClick={() => setSelected(e)}
-              className="flex w-full items-center justify-between rounded-xl border border-white/5 bg-card/50 px-3 py-2.5 text-left transition-colors hover:bg-card/80"
+              className="flex w-full items-center justify-between rounded-2xl border border-white/7 bg-white/[0.045] px-3 py-2.5 text-left transition-colors hover:bg-white/[0.075]"
             >
               <div>
                 <p className="text-sm font-medium">{e.name}</p>
@@ -260,7 +262,7 @@ export function ExerciseLogForm() {
                   {CATEGORY_LABELS[e.category]} · {e.mets} MET
                 </p>
               </div>
-              <Plus className="size-4 text-[var(--rosso)]" />
+              <Plus className="size-4 text-[var(--rosso-light)]" />
             </button>
           ))}
           {list.length === 0 && (

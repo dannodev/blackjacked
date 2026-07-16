@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import Image from "next/image";
 import { Wordmark } from "./wordmark";
 
 export function BrandSplash({ fullScreen = false }: { fullScreen?: boolean }) {
@@ -58,9 +59,14 @@ export function BrandSplash({ fullScreen = false }: { fullScreen?: boolean }) {
           transition={{ delay: 0.5, type: "spring", stiffness: 200, damping: 14 }}
           className="absolute inset-0 flex items-center justify-center"
         >
-          <svg viewBox="0 0 24 24" className="h-8 w-8 text-[var(--rosso)]">
-            <path d="M13 2 4.5 13.5h6L11 22l8.5-11.5h-6L13 2Z" fill="currentColor" />
-          </svg>
+          <Image
+            src="/blackjacked-logo.png"
+            alt="BlackJacked"
+            width={64}
+            height={64}
+            className="h-14 w-14 object-contain drop-shadow-[0_0_14px_rgba(212,0,0,0.5)]"
+            priority
+          />
         </motion.div>
       </motion.div>
 

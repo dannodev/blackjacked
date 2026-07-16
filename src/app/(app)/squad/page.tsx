@@ -50,17 +50,18 @@ export default function SquadPage() {
 
   if (!squad) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-5">
         <div>
-          <h1 className="font-heading text-2xl font-bold">Squad</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--rosso-light)]">Community</p>
+          <h1 className="font-heading text-3xl font-extrabold">Squad</h1>
+          <p className="text-sm font-medium text-muted-foreground">
             Race your friends to the calorie goal.
           </p>
         </div>
 
-        <Card className="rounded-3xl border-white/5 bg-card/60 backdrop-blur-xl">
+        <Card className="premium-panel rounded-[1.8rem]">
           <CardContent className="flex flex-col items-center gap-4 py-10 text-center">
-            <div className="flex size-16 items-center justify-center rounded-2xl bg-[var(--rosso)]/10 text-[var(--rosso)]">
+            <div className="flex size-16 items-center justify-center rounded-2xl bg-[var(--rosso)]/12 text-[var(--rosso-light)]">
               <Users className="size-8" />
             </div>
             <div>
@@ -112,11 +113,11 @@ export default function SquadPage() {
   );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-muted-foreground">{squad.members.length} racer{squad.members.length === 1 ? "" : "s"}</p>
-          <h1 className="font-heading text-2xl font-bold">{squad.name}</h1>
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--rosso-light)]">{squad.members.length} racer{squad.members.length === 1 ? "" : "s"}</p>
+          <h1 className="font-heading text-3xl font-extrabold">{squad.name}</h1>
         </div>
         <button
           onClick={() => {
@@ -149,10 +150,10 @@ export default function SquadPage() {
 
       {/* add member */}
       {squad.members.length < 6 && (
-        <Card className="rounded-3xl border-white/5 bg-card/60 backdrop-blur-xl">
+        <Card className="premium-panel rounded-[1.6rem]">
           <CardHeader>
             <CardTitle className="font-heading text-base flex items-center gap-2">
-              <Plus className="size-4 text-[var(--rosso)]" />
+              <Plus className="size-4 text-[var(--rosso-light)]" />
               Add a racer
             </CardTitle>
           </CardHeader>
@@ -230,7 +231,7 @@ function MemberCard({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -8 }}
     >
-      <Card className="rounded-3xl border-white/5 bg-card/60 backdrop-blur-xl">
+      <Card className="carbon-card rounded-[1.6rem] border-white/7">
         <CardContent className="py-4">
           <div className="flex items-center gap-3">
             <div
@@ -242,7 +243,7 @@ function MemberCard({
             <div className="flex-1">
               <div className="flex items-center justify-between">
                 <p className="font-heading text-base font-bold">{member.name}</p>
-                <div className="flex items-center gap-1 text-[var(--rosso)]">
+                <div className="flex items-center gap-1 text-[var(--rosso-light)]">
                   <Flame className="size-3.5" />
                   <span className="text-xs font-semibold">{member.streak}</span>
                 </div>
@@ -276,7 +277,7 @@ function MemberCard({
             </Button>
             <Dialog open={editOpen} onOpenChange={setEditOpen}>
               <DialogTrigger className="hidden" />
-              <DialogContent className="rounded-3xl border-white/5 bg-[var(--smoke)]">
+              <DialogContent className="rounded-[1.8rem] border-white/7 bg-[var(--smoke)]">
                 <DialogHeader>
                   <DialogTitle className="font-heading">Update {member.name}</DialogTitle>
                 </DialogHeader>

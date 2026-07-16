@@ -4,20 +4,25 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* ============ Rosso / Ferrari-inspired brand tokens ============ */
+/* ============ Premium red fitness brand tokens ============ */
 :root {
-  --rosso: #D40000;
-  --rosso-light: #FF1a1a;
-  --rosso-dark: #990000;
-  --rosso-glow: rgba(212, 0, 0, 0.15);
-  --amber: #F5A524;
-  --over: #FF4d4d;
-  --ink: #080808;
-  --paper: #F5F5F5;
-  --smoke: #121214;
-  --charcoal: #1A1A1D;
-  --graphite: #2A2A2E;
-  --carbon: #0F0F11;
+  --rosso: #f43f3f;
+  --rosso-light: #ff6b5f;
+  --rosso-dark: #9d1016;
+  --rosso-glow: rgba(244, 63, 63, 0.22);
+  --ember: #ff7a1a;
+  --amber: #f7b955;
+  --aqua: #72e7dd;
+  --violet: #b089ff;
+  --over: #ff5a6d;
+  --ink: #050507;
+  --paper: #f7f3ef;
+  --smoke: #0d0d10;
+  --charcoal: #151519;
+  --graphite: #232329;
+  --carbon: #09090b;
+  --panel: #111114;
+  --panel-soft: #19191e;
 }
 
 @theme inline {
@@ -65,72 +70,72 @@
 
 /* Light palette retained for completeness; app is dark by default. */
 :root {
-  --background: #F5F5F5;
-  --foreground: #080808;
-  --card: #FFFFFF;
-  --card-foreground: #080808;
-  --popover: #FFFFFF;
-  --popover-foreground: #080808;
-  --primary: #D40000;
-  --primary-foreground: #FFFFFF;
-  --secondary: #E7E5DF;
-  --secondary-foreground: #080808;
-  --muted: #E7E5DF;
-  --muted-foreground: #6B7280;
-  --accent: #E7E5DF;
-  --accent-foreground: #080808;
-  --destructive: #FF4d4d;
-  --border: #D8D6CF;
-  --input: #D8D6CF;
-  --ring: #D40000;
-  --chart-1: #D40000;
-  --chart-2: #F5A524;
-  --chart-3: #4cc2ff;
+  --background: #f7f3ef;
+  --foreground: #050507;
+  --card: #ffffff;
+  --card-foreground: #050507;
+  --popover: #ffffff;
+  --popover-foreground: #050507;
+  --primary: #f43f3f;
+  --primary-foreground: #ffffff;
+  --secondary: #ede7df;
+  --secondary-foreground: #050507;
+  --muted: #ede7df;
+  --muted-foreground: #70707a;
+  --accent: #ede7df;
+  --accent-foreground: #050507;
+  --destructive: #ff5a6d;
+  --border: #ded8cf;
+  --input: #ded8cf;
+  --ring: #f43f3f;
+  --chart-1: #f43f3f;
+  --chart-2: #ff7a1a;
+  --chart-3: #72e7dd;
   --chart-4: #22c55e;
-  --chart-5: #8a8f9a;
-  --radius: 0.9rem;
-  --sidebar: #0F0F11;
-  --sidebar-foreground: #F5F5F5;
-  --sidebar-primary: #D40000;
-  --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #1A1A1D;
-  --sidebar-accent-foreground: #F5F5F5;
+  --chart-5: #b089ff;
+  --radius: 1.05rem;
+  --sidebar: #09090b;
+  --sidebar-foreground: #f7f3ef;
+  --sidebar-primary: #f43f3f;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #19191e;
+  --sidebar-accent-foreground: #f7f3ef;
   --sidebar-border: rgba(255, 255, 255, 0.08);
   --sidebar-ring: #D40000;
 }
 
 /* Dark theme = Rosso identity. Always-on (html.dark). */
 .dark {
-  --background: #080808;
-  --foreground: #F5F5F5;
-  --card: #121214;
-  --card-foreground: #F5F5F5;
-  --popover: #121214;
-  --popover-foreground: #F5F5F5;
-  --primary: #D40000;
-  --primary-foreground: #FFFFFF;
-  --secondary: #1A1A1D;
-  --secondary-foreground: #F5F5F5;
-  --muted: #1A1A1D;
-  --muted-foreground: #9a9a9f;
-  --accent: #1A1A1D;
-  --accent-foreground: #F5F5F5;
-  --destructive: #FF4d4d;
-  --border: rgba(255, 255, 255, 0.08);
-  --input: rgba(255, 255, 255, 0.12);
-  --ring: #D40000;
-  --chart-1: #D40000;
-  --chart-2: #F5A524;
-  --chart-3: #4cc2ff;
+  --background: #050507;
+  --foreground: #f7f3ef;
+  --card: #111114;
+  --card-foreground: #f7f3ef;
+  --popover: #151519;
+  --popover-foreground: #f7f3ef;
+  --primary: #f43f3f;
+  --primary-foreground: #ffffff;
+  --secondary: #19191e;
+  --secondary-foreground: #f7f3ef;
+  --muted: #19191e;
+  --muted-foreground: #a1a1aa;
+  --accent: #221819;
+  --accent-foreground: #f7f3ef;
+  --destructive: #ff5a6d;
+  --border: rgba(255, 255, 255, 0.075);
+  --input: rgba(255, 255, 255, 0.105);
+  --ring: #f43f3f;
+  --chart-1: #f43f3f;
+  --chart-2: #ff7a1a;
+  --chart-3: #72e7dd;
   --chart-4: #22c55e;
-  --chart-5: #8a8f9a;
-  --radius: 0.9rem;
-  --sidebar: #0A0A0C;
-  --sidebar-foreground: #F5F5F5;
-  --sidebar-primary: #D40000;
-  --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #1A1A1D;
-  --sidebar-accent-foreground: #F5F5F5;
+  --chart-5: #b089ff;
+  --radius: 1.05rem;
+  --sidebar: #050507;
+  --sidebar-foreground: #f7f3ef;
+  --sidebar-primary: #f43f3f;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #19191e;
+  --sidebar-accent-foreground: #f7f3ef;
   --sidebar-border: rgba(255, 255, 255, 0.08);
   --sidebar-ring: #D40000;
 }
@@ -141,24 +146,14 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-feature-settings: "ss01", "cv01";
-    /* Carbon-fiber texture */
+    min-height: 100dvh;
+    font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+    font-feature-settings: "ss01", "cv01", "tnum";
     background-image:
-      repeating-linear-gradient(
-        45deg,
-        rgba(255,255,255,0.012) 0px,
-        rgba(255,255,255,0.012) 1px,
-        transparent 1px,
-        transparent 3px
-      ),
-      repeating-linear-gradient(
-        -45deg,
-        rgba(255,255,255,0.012) 0px,
-        rgba(255,255,255,0.012) 1px,
-        transparent 1px,
-        transparent 3px
-      );
-    background-size: 4px 4px, 4px 4px;
+      radial-gradient(circle at 50% -10%, rgba(244, 63, 63, 0.18), transparent 34rem),
+      radial-gradient(circle at 110% 18%, rgba(255, 122, 26, 0.13), transparent 26rem),
+      linear-gradient(180deg, #111114 0%, #050507 42%, #050507 100%);
+    background-attachment: fixed;
   }
   html {
     @apply font-sans;
@@ -169,65 +164,70 @@
   }
 }
 
-/* Racing stripe accent — subtle red line at top of app */
-.racing-stripe {
+/* Soft app edge light inspired by premium mobile fitness references. */
+.racing-stripe,
+.app-glow {
   position: relative;
 }
-.racing-stripe::before {
+.racing-stripe::before,
+.app-glow::before {
   content: "";
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: 2px;
+  height: 1px;
   background: linear-gradient(
     90deg,
-    transparent 0%,
-    var(--rosso) 15%,
-    var(--rosso) 30%,
-    transparent 30%,
-    transparent 35%,
-    var(--rosso) 35%,
-    var(--rosso) 50%,
-    transparent 50%,
-    transparent 85%,
-    var(--rosso) 85%,
-    var(--rosso) 100%
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    var(--rosso),
+    rgba(255, 122, 26, 0.5),
+    transparent
   );
-  opacity: 0.6;
+  opacity: 0.75;
 }
 
-/* Carbon-fiber card surface */
 .carbon-card {
-  background-color: var(--card);
+  border-color: rgba(255, 255, 255, 0.07);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.012)),
+    var(--card);
   background-image:
-    repeating-linear-gradient(
-      45deg,
-      rgba(255,255,255,0.008) 0px,
-      rgba(255,255,255,0.008) 1px,
-      transparent 1px,
-      transparent 4px
-    ),
-    repeating-linear-gradient(
-      -45deg,
-      rgba(255,255,255,0.008) 0px,
-      rgba(255,255,255,0.008) 1px,
-      transparent 1px,
-      transparent 4px
-    );
-  background-size: 5px 5px, 5px 5px;
+    linear-gradient(145deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.012)),
+    radial-gradient(circle at top right, rgba(244, 63, 63, 0.11), transparent 15rem);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.36);
 }
 
-/* Glassmorphism card */
 .glass-card {
-  background: rgba(18, 18, 20, 0.6);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  background: rgba(17, 17, 20, 0.72);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.34);
 }
 
-/* Red glow shadow */
+.premium-panel {
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018)),
+    #111114;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 20px 50px rgba(0, 0, 0, 0.38);
+}
+
+.chart-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
 .rosso-glow {
-  box-shadow: 0 0 24px rgba(212, 0, 0, 0.25), 0 0 1px rgba(212, 0, 0, 0.4);
+  box-shadow: 0 0 28px rgba(244, 63, 63, 0.32), 0 12px 30px rgba(157, 16, 22, 0.34);
+}
+
+.text-balance {
+  text-wrap: balance;
 }
 
 /* Scrollbar styling */

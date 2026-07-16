@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { useStore } from "@/lib/store";
+import { makeId } from "@/lib/id";
 import type { Recipe } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,11 +24,12 @@ export default function RecipesPage() {
   const [showForm, setShowForm] = useState(false);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-bold">Recipes</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--rosso-light)]">Kitchen</p>
+          <h1 className="font-heading text-3xl font-extrabold">Recipes</h1>
+          <p className="text-sm font-medium text-muted-foreground">
             Save and reuse your go-to meals
           </p>
         </div>
@@ -54,9 +56,9 @@ export default function RecipesPage() {
       </AnimatePresence>
 
       {recipes.length === 0 && !showForm ? (
-        <Card className="rounded-2xl border-dashed border-white/10 bg-card/40">
+        <Card className="rounded-[1.6rem] border-dashed border-white/10 bg-white/[0.035]">
           <CardContent className="flex flex-col items-center gap-3 py-8 text-center">
-            <div className="flex size-12 items-center justify-center rounded-2xl bg-[var(--rosso)]/10 text-[var(--rosso)]">
+            <div className="flex size-12 items-center justify-center rounded-2xl bg-[var(--rosso)]/12 text-[var(--rosso-light)]">
               <ChefHat className="size-6" />
             </div>
             <p className="max-w-xs text-sm text-muted-foreground">
@@ -72,7 +74,7 @@ export default function RecipesPage() {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
             >
-              <Card className="rounded-2xl border-white/5 bg-card/60 backdrop-blur-xl">
+              <Card className="carbon-card rounded-[1.45rem] border-white/7">
                 <CardContent className="py-4">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1">
@@ -86,6 +88,7 @@ export default function RecipesPage() {
                         deleteRecipe(r.id);
                         toast.success("Recipe deleted");
                       }}
+                      aria-label="Delete recipe"
                       className="text-muted-foreground hover:text-[var(--over)]"
                     >
                       <Trash2 className="size-4" />
@@ -148,7 +151,7 @@ function RecipeForm({
       return;
     }
     const recipe: Recipe = {
-      id: crypto.randomUUID(),
+      id: makeId(),
       name,
       servings,
       instructions,
@@ -156,7 +159,7 @@ function RecipeForm({
       ingredients: ingredients
         .filter((i) => i.name.trim())
         .map((i) => ({
-          food_item_id: crypto.randomUUID(),
+          food_item_id: makeId(),
           name: i.name,
           qty: i.qty,
           unit: i.unit,
@@ -172,7 +175,7 @@ function RecipeForm({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -12 }}
     >
-      <Card className="rounded-2xl border-white/5 bg-card/60 backdrop-blur-xl">
+      <Card className="premium-panel rounded-[1.6rem]">
         <CardHeader>
           <CardTitle className="font-heading text-base">New recipe</CardTitle>
         </CardHeader>
@@ -218,6 +221,7 @@ function RecipeForm({
                 />
                 <button
                   onClick={() => removeIngredient(i)}
+                  aria-label="Remove ingredient"
                   className="text-muted-foreground hover:text-[var(--over)]"
                 >
                   <X className="size-4" />
@@ -235,7 +239,7 @@ function RecipeForm({
               value={instructions}
               onChange={(e) => setInstructions(e.target.value)}
               placeholder="Marinate 15 min, grill…"
-              className="min-h-16 w-full resize-none rounded-xl border border-white/10 bg-background/60 px-3 py-2 text-sm outline-none focus:border-[var(--rosso)]"
+              className="min-h-20 w-full resize-none rounded-2xl border border-white/10 bg-white/[0.045] px-3.5 py-3 text-sm outline-none focus:border-[var(--rosso)]"
             />
           </div>
           <div className="flex gap-2">

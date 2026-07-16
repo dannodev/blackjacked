@@ -44,7 +44,7 @@ export function DeficitRing({
     };
   }, [fraction, remaining, dashoffset, displayRemaining]);
 
-  const dim = size === "lg" ? 256 : 200;
+  const dim = size === "lg" ? 238 : 190;
 
   return (
     <div
@@ -61,8 +61,8 @@ export function DeficitRing({
           cy="100"
           r={R}
           fill="none"
-          stroke="rgba(255,255,255,0.08)"
-          strokeWidth="14"
+          stroke="rgba(255,255,255,0.075)"
+          strokeWidth="12"
         />
         <motion.circle
           cx="100"
@@ -70,17 +70,17 @@ export function DeficitRing({
           r={R}
           fill="none"
           stroke={color}
-          strokeWidth="14"
+          strokeWidth="12"
           strokeLinecap="round"
           strokeDasharray={CIRC}
           style={{ strokeDashoffset: dashoffset, filter: `drop-shadow(0 0 10px ${color}66)` }}
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <motion.span className="font-heading text-5xl font-bold text-foreground">
+        <motion.span className="font-heading text-5xl font-extrabold tracking-normal text-foreground">
           <AnimatedNumber value={remaining} />
         </motion.span>
-        <span className="mt-1 text-xs uppercase tracking-wide text-muted-foreground">
+        <span className="mt-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           kcal left
         </span>
         <span
@@ -91,7 +91,7 @@ export function DeficitRing({
         </span>
       </div>
       {/* mini stats under ring */}
-      <div className="mt-5 grid w-full grid-cols-3 gap-2 text-center">
+      <div className="mt-4 grid w-full grid-cols-3 gap-2 text-center">
         <Stat label="In" value={inToday} />
         <Stat label="Burn" value={outActivity} />
         <Stat label="TDEE" value={tdee} />
@@ -112,11 +112,11 @@ function AnimatedNumber({ value }: { value: number }) {
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-xl bg-white/5 px-2 py-2">
+    <div className="rounded-2xl border border-white/7 bg-white/[0.045] px-2 py-2">
       <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
-      <p className="font-heading text-lg font-semibold">{Math.round(value)}</p>
+      <p className="font-heading text-lg font-bold">{Math.round(value)}</p>
     </div>
   );
 }

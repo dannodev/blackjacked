@@ -19,6 +19,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAuth } from "@/lib/auth";
+import { saveSupabaseProfile } from "@/lib/supabase/profile";
 import {
   Card,
   CardContent,
@@ -48,8 +50,10 @@ const STEPS = ["You", "Activity", "Goal"] as const;
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const setProfile = useStore((s) => s.setProfile);
   const [step, setStep] = useState(0);
+  const [saving, setSaving] = useState(false);
 
   const basicsForm = useForm<Basics>({
     resolver: zodResolver(basicsSchema) as Resolver<Basics>,
@@ -99,7 +103,7 @@ export default function OnboardingPage() {
     goalForm.setValue("protein_goal", protein, { shouldDirty: true });
     goalForm.setValue("fat_goal", fat, { shouldDirty: true });
     goalForm.setValue("carb_goal", carb, { shouldDirty: true });
-  }, [watchCalorieGoal, step, watchBasics?.current_weight_kg]);
+  }, [watchCalorieGoal, step, watchBasics?.current_weight_kg, goalForm]);
 
   const onBasicsSubmit = () => {
     basicsForm.clearErrors();
@@ -117,9 +121,9 @@ export default function OnboardingPage() {
     setStep(2);
   };
 
-  const onGoalSubmit = (values: Goal) => {
+  const onGoalSubmit = async (values: Goal) => {
     const b = basicsForm.getValues();
-    setProfile({
+    const profile = {
       sex: b.sex,
       birthdate: b.birthdate,
       height_cm: b.height_cm,
@@ -130,9 +134,21 @@ export default function OnboardingPage() {
       fat_goal: values.fat_goal,
       carb_goal: values.carb_goal,
       createdAt: new Date().toISOString(),
-    });
-    toast.success("Profile saved. Let's burn.");
-    router.replace("/dashboard");
+    };
+
+    try {
+      setSaving(true);
+      const savedProfile = user
+        ? await saveSupabaseProfile(user.id, profile)
+        : profile;
+      setProfile(savedProfile);
+      toast.success("Profile saved. Let's burn.");
+      router.replace("/dashboard");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not save profile");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -161,11 +177,12 @@ export default function OnboardingPage() {
             onSubmit={basicsForm.handleSubmit(onBasicsSubmit)}
             className="space-y-4"
           >
-            <h1 className="font-heading text-2xl font-bold">Set up</h1>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--rosso-light)]">Start</p>
+            <h1 className="font-heading text-3xl font-extrabold">Set up</h1>
+            <p className="text-sm font-medium text-muted-foreground">
               We use these to power your BMR, TDEE, and deficit math.
             </p>
-            <Card className="rounded-2xl border-white/5 bg-card/60 backdrop-blur-xl">
+            <Card className="premium-panel rounded-[1.6rem]">
               <CardContent className="space-y-4 py-5">
                 <div className="space-y-2">
                   <Label>Sex (biological)</Label>
@@ -176,9 +193,9 @@ export default function OnboardingPage() {
                         key={s}
                         onClick={() => basicsForm.setValue("sex", s)}
                         className={cn(
-                          "rounded-xl border px-3 py-2.5 text-sm capitalize transition-colors",
+                          "rounded-full border px-3 py-2.5 text-sm font-semibold capitalize transition-colors",
                           basicsForm.watch("sex") === s
-                            ? "border-[var(--rosso)] bg-[var(--rosso)]/10 text-[var(--rosso)]"
+                            ? "border-[var(--rosso)] bg-[var(--rosso)]/12 text-[var(--rosso-light)]"
                             : "border-white/10 text-muted-foreground",
                         )}
                       >
@@ -230,7 +247,7 @@ export default function OnboardingPage() {
             </Card>
             <Button
               type="submit"
-              className="w-full bg-[var(--rosso)] text-white font-semibold hover:bg-[var(--rosso)]/90"
+              className="w-full bg-[var(--rosso)] font-semibold text-white hover:bg-[var(--rosso)]/90"
             >
               Continue
             </Button>
@@ -246,8 +263,9 @@ export default function OnboardingPage() {
             transition={{ duration: 0.2 }}
             className="space-y-4"
           >
-            <h1 className="font-heading text-2xl font-bold">Activity</h1>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--rosso-light)]">Pace</p>
+            <h1 className="font-heading text-3xl font-extrabold">Activity</h1>
+            <p className="text-sm font-medium text-muted-foreground">
               How active are you day to day?
             </p>
             <div className="space-y-2">
@@ -260,15 +278,15 @@ export default function OnboardingPage() {
                     goalForm.trigger("activity_factor");
                   }}
                   className={cn(
-                    "w-full rounded-2xl border px-4 py-3 text-left transition-colors",
+                    "w-full rounded-[1.35rem] border px-4 py-3 text-left transition-colors",
                     goalForm.watch("activity_factor") === opt.value
                       ? "border-[var(--rosso)] bg-[var(--rosso)]/10"
-                      : "border-white/10 bg-card/40",
+                      : "border-white/10 bg-white/[0.035]",
                   )}
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-medium">{opt.label}</span>
-                    <span className="font-heading text-sm text-[var(--rosso)]">
+                    <span className="font-heading text-sm text-[var(--rosso-light)]">
                       ×{opt.value}
                     </span>
                   </div>
@@ -285,7 +303,7 @@ export default function OnboardingPage() {
                 Back
               </Button>
               <Button
-                className="flex-1 bg-[var(--rosso)] text-white font-semibold hover:bg-[var(--rosso)]/90"
+                className="flex-1 bg-[var(--rosso)] font-semibold text-white hover:bg-[var(--rosso)]/90"
                 onClick={onActivityNext}
               >
                 Continue
@@ -304,7 +322,7 @@ export default function OnboardingPage() {
             onSubmit={goalForm.handleSubmit(onGoalSubmit)}
             className="space-y-4"
           >
-            <Card className="rounded-2xl border-white/5 bg-card/60 backdrop-blur-xl">
+            <Card className="premium-panel rounded-[1.6rem]">
               <CardHeader>
                 <CardTitle className="font-heading text-base">
                   Your targets
@@ -312,7 +330,7 @@ export default function OnboardingPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {suggestion && (
-                  <div className="rounded-xl bg-[var(--rosso)]/10 px-3 py-2 text-xs text-[var(--rosso)]">
+                  <div className="rounded-2xl bg-[var(--rosso)]/12 px-3 py-2 text-xs text-[var(--rosso-light)]">
                     Suggested from your TDEE ≈{" "}
                     <span className="font-heading">
                       {Math.round(suggestion.tdee)}
@@ -373,9 +391,10 @@ export default function OnboardingPage() {
               </Button>
               <Button
                 type="submit"
-                className="flex-1 bg-[var(--rosso)] text-white font-semibold hover:bg-[var(--rosso)]/90"
+                className="flex-1 bg-[var(--rosso)] font-semibold text-white hover:bg-[var(--rosso)]/90"
+                disabled={saving}
               >
-                Finish
+                {saving ? "Saving..." : "Finish"}
               </Button>
             </div>
           </motion.form>
