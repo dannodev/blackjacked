@@ -56,6 +56,7 @@ interface State {
   deleteMeal: (id: string) => void;
   addExerciseLog: (e: ExerciseLog) => void;
   deleteExerciseLog: (id: string) => void;
+  setWeightLogs: (logs: WeightLog[]) => void;
   addWeightLog: (w: WeightLog) => void;
   addCustomFood: (f: FoodItem) => void;
   addRecipe: (r: Recipe) => void;
@@ -111,6 +112,18 @@ export const useStore = create<State>()(
       },
       deleteExerciseLog: (id) =>
         set((s) => ({ exerciseLogs: s.exerciseLogs.filter((e) => e.id !== id) })),
+
+      setWeightLogs: (logs) =>
+        set((s) => {
+          const latestWeight = [...logs].reverse().find((log) => log.weight_kg);
+          return {
+            weightLogs: logs,
+            profile:
+              s.profile && latestWeight
+                ? { ...s.profile, current_weight_kg: latestWeight.weight_kg }
+                : s.profile,
+          };
+        }),
 
       addWeightLog: (w) =>
         set((s) => {

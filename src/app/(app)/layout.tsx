@@ -9,6 +9,7 @@ import { useHydrated } from "@/lib/use-hydrated";
 import { useStore } from "@/lib/store";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 import { loadSupabaseProfile } from "@/lib/supabase/profile";
+import { loadSupabaseWeightLogs } from "@/lib/supabase/weight-logs";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -16,6 +17,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const hydrated = useHydrated();
   const profile = useStore((s) => s.profile);
   const setProfile = useStore((s) => s.setProfile);
+  const setWeightLogs = useStore((s) => s.setWeightLogs);
   const [profileChecked, setProfileChecked] = useState(false);
 
   useEffect(() => {
@@ -46,6 +48,26 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       cancelled = true;
     };
   }, [hydrated, user, profile, setProfile]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function syncWeightLogs() {
+      if (!hydrated || !user || !profile || !isSupabaseConfigured()) return;
+
+      try {
+        const remoteLogs = await loadSupabaseWeightLogs(user.id);
+        if (!cancelled && remoteLogs.length > 0) setWeightLogs(remoteLogs);
+      } catch {
+        // Local check-ins still work if cloud sync is temporarily unavailable.
+      }
+    }
+
+    void syncWeightLogs();
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrated, profile, setWeightLogs, user]);
 
   useEffect(() => {
     if (hydrated && user && profileChecked && !profile) router.replace("/onboarding");

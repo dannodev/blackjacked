@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import { useStore } from "@/lib/store";
 import { makeId } from "@/lib/id";
 import type { WeightLog } from "@/lib/types";
+import { useAuth } from "@/lib/auth";
+import { saveSupabaseWeightLog } from "@/lib/supabase/weight-logs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +20,7 @@ import {
 import { Camera, Scale } from "lucide-react";
 
 export default function CheckInPage() {
+  const { user } = useAuth();
   const profile = useStore((s) => s.profile)!;
   const addWeightLog = useStore((s) => s.addWeightLog);
 
@@ -27,6 +30,8 @@ export default function CheckInPage() {
   const [hip, setHip] = useState<number | "">("");
   const [arm, setArm] = useState<number | "">("");
   const [photoUrl, setPhotoUrl] = useState<string | undefined>();
+  const [photoBlob, setPhotoBlob] = useState<Blob | null>(null);
+  const [saving, setSaving] = useState(false);
 
   async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -34,20 +39,36 @@ export default function CheckInPage() {
 
     try {
       const compressed = await compressPhoto(file);
-      setPhotoUrl(compressed);
+      setPhotoUrl(compressed.previewUrl);
+      setPhotoBlob(compressed.blob);
       toast.success("Photo ready", {
-        description: "Saved locally on this device, compressed to save space.",
+        description: "Compressed and ready for cloud sync.",
       });
     } catch {
       toast.error("Could not process photo");
     }
   }
 
-  function save() {
+  async function save() {
     if (!weight || weight <= 0) {
       toast.error("Enter your weight");
       return;
     }
+
+    setSaving(true);
+    let uploadedPhotoUrl = photoUrl;
+
+    if (photoBlob) {
+      try {
+        uploadedPhotoUrl = await uploadCloudPhoto(photoBlob);
+      } catch (error) {
+        toast.info("Cloud photo upload skipped", {
+          description:
+            error instanceof Error ? error.message : "Saved locally for now.",
+        });
+      }
+    }
+
     const log: WeightLog = {
       id: makeId(),
       weight_kg: weight,
@@ -55,18 +76,35 @@ export default function CheckInPage() {
       chest_cm: typeof chest === "number" ? chest : undefined,
       hip_cm: typeof hip === "number" ? hip : undefined,
       arm_cm: typeof arm === "number" ? arm : undefined,
-      photo_url: photoUrl,
+      photo_url: uploadedPhotoUrl,
       loggedAt: new Date().toISOString(),
     };
-    addWeightLog(log);
-    toast.success("Check-in saved", {
-      description: `${weight} kg logged`,
-    });
-    setWaist("");
-    setChest("");
-    setHip("");
-    setArm("");
-    setPhotoUrl(undefined);
+
+    try {
+      const canCloudSyncPhoto =
+        uploadedPhotoUrl?.startsWith("https://res.cloudinary.com") ?? false;
+      const remoteLog: WeightLog = {
+        ...log,
+        photo_url: canCloudSyncPhoto ? uploadedPhotoUrl : undefined,
+      };
+      if (user) await saveSupabaseWeightLog(user.id, remoteLog);
+      addWeightLog(log);
+      toast.success("Check-in saved", {
+        description: canCloudSyncPhoto
+          ? `${weight} kg logged with cloud photo`
+          : `${weight} kg logged`,
+      });
+      setWaist("");
+      setChest("");
+      setHip("");
+      setArm("");
+      setPhotoUrl(undefined);
+      setPhotoBlob(null);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not save check-in");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -148,8 +186,8 @@ export default function CheckInPage() {
           <div className="space-y-2">
             <Label className="text-xs">Progress photo (optional)</Label>
             <p className="text-xs text-muted-foreground">
-              Photos stay local on this device and are compressed before saving.
-              They do not use Supabase storage.
+              Photos are compressed, uploaded to Cloudinary when configured,
+              and only the private URL is stored with your check-in.
             </p>
             <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-white/15 bg-white/[0.035] px-4 py-6 text-sm text-muted-foreground transition-colors hover:border-[var(--rosso)]/40">
               <Camera className="size-5" />
@@ -170,9 +208,10 @@ export default function CheckInPage() {
 
           <Button
             onClick={save}
+            disabled={saving}
             className="w-full bg-[var(--rosso)] font-semibold text-white hover:bg-[var(--rosso)]/90"
           >
-            Save check-in
+            {saving ? "Saving..." : "Save check-in"}
           </Button>
         </CardContent>
       </Card>
@@ -180,7 +219,10 @@ export default function CheckInPage() {
   );
 }
 
-async function compressPhoto(file: File): Promise<string> {
+async function compressPhoto(file: File): Promise<{
+  blob: Blob;
+  previewUrl: string;
+}> {
   const image = await createImageBitmap(file, {
     imageOrientation: "from-image",
   });
@@ -197,5 +239,31 @@ async function compressPhoto(file: File): Promise<string> {
   context.drawImage(image, 0, 0, width, height);
   image.close();
 
-  return canvas.toDataURL("image/jpeg", 0.72);
+  const blob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob(resolve, "image/jpeg", 0.72),
+  );
+
+  if (!blob) throw new Error("Image compression failed");
+
+  return {
+    blob,
+    previewUrl: canvas.toDataURL("image/jpeg", 0.72),
+  };
+}
+
+async function uploadCloudPhoto(blob: Blob): Promise<string> {
+  const formData = new FormData();
+  formData.append("file", blob, `checkin-${Date.now()}.jpg`);
+
+  const response = await fetch("/api/checkin-photo", {
+    method: "POST",
+    body: formData,
+  });
+  const result = (await response.json()) as { url?: string; error?: string };
+
+  if (!response.ok || !result.url) {
+    throw new Error(result.error ?? "Cloudinary is not configured yet.");
+  }
+
+  return result.url;
 }
