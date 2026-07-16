@@ -1,11 +1,39 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type React from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  Copy,
+  Crown,
+  Dumbbell,
+  Flame,
+  Loader2,
+  LogOut,
+  MessageCircle,
+  Plus,
+  Send,
+  ShieldCheck,
+  Utensils,
+  Users,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
-import type { SquadMember } from "@/lib/types";
+import { sameDay, todayKey } from "@/lib/types";
+import {
+  createRemoteSquad,
+  joinRemoteSquad,
+  leaveRemoteSquad,
+  loadMySquad,
+  sendSquadMessage,
+  subscribeToSquad,
+  syncMySquadActivity,
+  type SquadActivityRow,
+  type SquadMemberRow,
+  type SquadMessageRow,
+  type SquadSnapshot,
+} from "@/lib/supabase/squad";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,91 +43,239 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Users, Plus, Flame, Trash2, Crown } from "lucide-react";
 
-const SQUAD_COLORS = [
-  "#dc0000",
-  "#f5a524",
-  "#4cc2ff",
-  "#22c55e",
-  "#a855f7",
-  "#ec4899",
-];
+type MemberWithActivity = SquadMemberRow & {
+  activity?: SquadActivityRow;
+};
 
 export default function SquadPage() {
-  const squad = useStore((s) => s.squad);
-  const createSquad = useStore((s) => s.createSquad);
-  const addMember = useStore((s) => s.addSquadMember);
-  const updateMember = useStore((s) => s.updateSquadMember);
-  const removeMember = useStore((s) => s.removeSquadMember);
-  const leaveSquad = useStore((s) => s.leaveSquad);
-
   const { user } = useAuth();
-  const profile = useStore((s) => s.profile)!;
+  const meals = useStore((s) => s.meals);
+  const exerciseLogs = useStore((s) => s.exerciseLogs);
+  const streaks = useStore((s) => s.streaks);
 
+  const [snapshot, setSnapshot] = useState<SquadSnapshot | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
   const [newSquadName, setNewSquadName] = useState("");
-  const [memberName, setMemberName] = useState("");
-  const [memberGoal, setMemberGoal] = useState("2000");
+  const [joinCode, setJoinCode] = useState("");
+  const [message, setMessage] = useState("");
 
-  if (!squad) {
+  const today = todayKey();
+  const displayName = user?.name || user?.email?.split("@")[0] || "Racer";
+
+  const publicActivity = useMemo(() => {
+    const todayMeals = meals.filter((meal) => sameDay(meal.loggedAt, today));
+    const todayExercises = exerciseLogs.filter((log) => sameDay(log.loggedAt, today));
+
+    return {
+      date: today,
+      kcalIn: todayMeals.reduce((sum, meal) => sum + meal.total_kcal, 0),
+      kcalOutActivity: todayExercises.reduce(
+        (sum, log) => sum + log.kcal_burned,
+        0,
+      ),
+      mealsCount: todayMeals.length,
+      workoutsCount: todayExercises.length,
+      streaks,
+    };
+  }, [exerciseLogs, meals, streaks, today]);
+
+  const refreshSquad = useCallback(async () => {
+    const next = await loadMySquad();
+    setSnapshot(next);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    refreshSquad().catch((error) => {
+      setLoading(false);
+      toast.error(error instanceof Error ? error.message : "Could not load squad");
+    });
+  }, [refreshSquad]);
+
+  useEffect(() => {
+    if (!snapshot?.squad.id) return;
+    return subscribeToSquad(snapshot.squad.id, () => {
+      refreshSquad().catch(() => {
+        toast.error("Could not refresh squad");
+      });
+    });
+  }, [refreshSquad, snapshot?.squad.id]);
+
+  useEffect(() => {
+    if (!snapshot?.squad.id) return;
+
+    syncMySquadActivity(snapshot.squad.id, publicActivity)
+      .then(refreshSquad)
+      .catch((error) => {
+        toast.error(
+          error instanceof Error ? error.message : "Could not sync squad stats",
+        );
+      });
+  }, [publicActivity, refreshSquad, snapshot?.squad.id]);
+
+  const members = useMemo<MemberWithActivity[]>(() => {
+    const activityByUser = new Map(
+      snapshot?.activity
+        .filter((activity) => activity.date === today)
+        .map((activity) => [activity.user_id, activity]) ?? [],
+    );
+
+    return [...(snapshot?.members ?? [])]
+      .map((member) => ({
+        ...member,
+        activity: activityByUser.get(member.user_id),
+      }))
+      .sort((a, b) => {
+        const aBurn = a.activity?.kcal_out_activity ?? 0;
+        const bBurn = b.activity?.kcal_out_activity ?? 0;
+        return bBurn - aBurn;
+      });
+  }, [snapshot?.activity, snapshot?.members, today]);
+
+  const handleCreate = async () => {
+    const name = newSquadName.trim();
+    if (!name) {
+      toast.error("Name your squad");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const next = await createRemoteSquad(name, displayName);
+      setSnapshot(next);
+      setNewSquadName("");
+      toast.success("Squad created");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not create squad");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleJoin = async () => {
+    const code = joinCode.trim();
+    if (!code) {
+      toast.error("Enter a squad code");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const next = await joinRemoteSquad(code, displayName);
+      setSnapshot(next);
+      setJoinCode("");
+      toast.success("Joined squad");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not join squad");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleLeave = async () => {
+    if (!snapshot) return;
+
+    setBusy(true);
+    try {
+      await leaveRemoteSquad(snapshot.squad.id);
+      setSnapshot(null);
+      toast.success("Left squad");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not leave squad");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!snapshot) return;
+    const body = message.trim();
+    if (!body) return;
+
+    try {
+      await sendSquadMessage(snapshot.squad.id, body);
+      setMessage("");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not send message");
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[45vh] items-center justify-center">
+        <Loader2 className="size-7 animate-spin text-[var(--rosso-light)]" />
+      </div>
+    );
+  }
+
+  if (!snapshot) {
     return (
       <div className="space-y-5">
-        <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--rosso-light)]">Community</p>
-          <h1 className="font-heading text-3xl font-extrabold">Squad</h1>
-          <p className="text-sm font-medium text-muted-foreground">
-            Race your friends to the calorie goal.
-          </p>
-        </div>
+        <SquadHeader
+          eyebrow="Community"
+          title="Squad"
+          subtitle="Create a crew or join one with a code. Shared stats stay public; body data stays private."
+        />
 
         <Card className="premium-panel rounded-[1.8rem]">
-          <CardContent className="flex flex-col items-center gap-4 py-10 text-center">
-            <div className="flex size-16 items-center justify-center rounded-2xl bg-[var(--rosso)]/12 text-[var(--rosso-light)]">
-              <Users className="size-8" />
+          <CardContent className="space-y-5 py-7">
+            <div className="flex items-start gap-3">
+              <div className="flex size-14 items-center justify-center rounded-2xl bg-[var(--rosso)]/12 text-[var(--rosso-light)]">
+                <Users className="size-7" />
+              </div>
+              <div>
+                <p className="font-heading text-lg font-bold">Start the beef</p>
+                <p className="text-sm text-muted-foreground">
+                  Create a squad and share the invite code with up to 5 friends.
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="font-heading text-lg font-bold">No crew yet</p>
-              <p className="max-w-xs text-sm text-muted-foreground">
-                Create a squad for you and up to 5 friends and track who is hitting their goals.
-              </p>
-            </div>
-            <div className="w-full max-w-xs space-y-2">
+
+            <div className="space-y-2">
               <Label htmlFor="squad-name">Squad name</Label>
               <Input
                 id="squad-name"
                 placeholder="e.g. Ferrari Fam"
                 value={newSquadName}
-                onChange={(e) => setNewSquadName(e.target.value)}
+                onChange={(event) => setNewSquadName(event.target.value)}
               />
               <Button
-                onClick={() => {
-                  if (!newSquadName.trim()) {
-                    toast.error("Name your squad");
-                    return;
-                  }
-                  createSquad(newSquadName.trim());
-                  addMember({
-                    name: user?.name || "You",
-                    color: SQUAD_COLORS[0],
-                    calorie_goal: profile.calorie_goal,
-                    kcal_in: 0,
-                    kcal_out: 0,
-                    streak: 0,
-                  });
-                  toast.success("Squad created");
-                  setNewSquadName("");
-                }}
+                onClick={handleCreate}
+                disabled={busy}
                 className="w-full bg-[var(--rosso)] text-white hover:bg-[var(--rosso)]/90"
               >
-                <Plus className="mr-1 size-4" />
+                {busy ? (
+                  <Loader2 className="mr-1 size-4 animate-spin" />
+                ) : (
+                  <Plus className="mr-1 size-4" />
+                )}
                 Create squad
+              </Button>
+            </div>
+
+            <div className="relative py-1 text-center text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
+              or join one
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="join-code">Squad code</Label>
+              <Input
+                id="join-code"
+                placeholder="A7K9Q2"
+                value={joinCode}
+                maxLength={6}
+                className="uppercase tracking-[0.25em]"
+                onChange={(event) => setJoinCode(event.target.value.toUpperCase())}
+              />
+              <Button
+                variant="outline"
+                onClick={handleJoin}
+                disabled={busy}
+                className="w-full"
+              >
+                Join squad
               </Button>
             </div>
           </CardContent>
@@ -108,104 +284,146 @@ export default function SquadPage() {
     );
   }
 
-  const sortedMembers = [...squad.members].sort(
-    (a, b) => b.kcal_in / Math.max(1, b.calorie_goal) - a.kcal_in / Math.max(1, a.calorie_goal),
-  );
-
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--rosso-light)]">{squad.members.length} racer{squad.members.length === 1 ? "" : "s"}</p>
-          <h1 className="font-heading text-3xl font-extrabold">{squad.name}</h1>
-        </div>
-        <button
-          onClick={() => {
-            leaveSquad();
-            toast.success("Left squad");
-          }}
-          className="text-xs text-muted-foreground underline-offset-4 hover:text-[var(--over)] hover:underline"
+      <div className="flex items-start justify-between gap-3">
+        <SquadHeader
+          eyebrow={`${members.length} racer${members.length === 1 ? "" : "s"}`}
+          title={snapshot.squad.name}
+          subtitle="Live workouts, meals, calories burned, and messages. No height or weight is shared."
+        />
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleLeave}
+          disabled={busy}
+          className="mt-1 shrink-0"
         >
+          <LogOut className="mr-1 size-4" />
           Leave
-        </button>
+        </Button>
       </div>
 
-      {/* leaderboard */}
+      <Card className="premium-panel rounded-[1.6rem]">
+        <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
+              Invite code
+            </p>
+            <p className="font-heading text-3xl font-black tracking-[0.18em] text-[var(--rosso-light)]">
+              {snapshot.squad.invite_code}
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => {
+              void navigator.clipboard.writeText(snapshot.squad.invite_code);
+              toast.success("Code copied");
+            }}
+          >
+            <Copy className="mr-1 size-4" />
+            Copy
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card className="premium-panel rounded-[1.6rem]">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 font-heading text-base">
+            <ShieldCheck className="size-4 text-[var(--rosso-light)]" />
+            Privacy line
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm text-muted-foreground">
+          Squad members only see today&apos;s meals count, calories in, calories
+          burned from workouts, workout count, and streak. Height, weight,
+          birthdate, and body measurements never sync to the squad.
+        </CardContent>
+      </Card>
+
       <div className="space-y-2">
         <AnimatePresence>
-          {sortedMembers.map((m, i) => (
+          {members.map((member, index) => (
             <MemberCard
-              key={m.id}
-              member={m}
-              rank={i + 1}
-              onUpdate={(patch) => updateMember(m.id, patch)}
-              onRemove={() => {
-                removeMember(m.id);
-                toast.success(`${m.name} removed`);
-              }}
+              key={member.user_id}
+              member={member}
+              rank={index + 1}
+              isYou={member.user_id === user?.id}
             />
           ))}
         </AnimatePresence>
       </div>
 
-      {/* add member */}
-      {squad.members.length < 6 && (
-        <Card className="premium-panel rounded-[1.6rem]">
-          <CardHeader>
-            <CardTitle className="font-heading text-base flex items-center gap-2">
-              <Plus className="size-4 text-[var(--rosso-light)]" />
-              Add a racer
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="space-y-2">
-              <Label htmlFor="name">Name</Label>
-              <Input
-                id="name"
-                placeholder="Carlos"
-                value={memberName}
-                onChange={(e) => setMemberName(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="goal">Daily calorie goal</Label>
-              <Input
-                id="goal"
-                type="number"
-                value={memberGoal}
-                onChange={(e) => setMemberGoal(e.target.value)}
-              />
-            </div>
-            <Button
-              onClick={() => {
-                if (!memberName.trim()) {
-                  toast.error("Enter a name");
-                  return;
+      <Card className="premium-panel rounded-[1.8rem]">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 font-heading text-base">
+            <MessageCircle className="size-4 text-[var(--rosso-light)]" />
+            Squad talk
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="max-h-72 space-y-3 overflow-y-auto pr-1">
+            {snapshot.messages.length === 0 ? (
+              <p className="rounded-2xl border border-white/7 bg-white/[0.03] px-4 py-5 text-center text-sm text-muted-foreground">
+                No messages yet. Be brave. Start the beef.
+              </p>
+            ) : (
+              snapshot.messages.map((item) => (
+                <MessageBubble
+                  key={item.id}
+                  message={item}
+                  member={snapshot.members.find(
+                    (member) => member.user_id === item.user_id,
+                  )}
+                  isYou={item.user_id === user?.id}
+                />
+              ))
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Input
+              value={message}
+              maxLength={500}
+              placeholder="Talk your trash..."
+              onChange={(event) => setMessage(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  void handleSendMessage();
                 }
-                const goal = Number(memberGoal);
-                if (!goal || goal < 800) {
-                  toast.error("Enter a realistic goal");
-                  return;
-                }
-                addMember({
-                  name: memberName.trim(),
-                  color: SQUAD_COLORS[squad.members.length % SQUAD_COLORS.length],
-                  calorie_goal: goal,
-                  kcal_in: 0,
-                  kcal_out: 0,
-                  streak: 0,
-                });
-                toast.success(`${memberName.trim()} joined the squad`);
-                setMemberName("");
-                setMemberGoal("2000");
               }}
-              className="w-full bg-[var(--rosso)] text-white hover:bg-[var(--rosso)]/90"
+            />
+            <Button
+              className="bg-[var(--rosso)] text-white hover:bg-[var(--rosso)]/90"
+              onClick={handleSendMessage}
             >
-              Add friend
+              <Send className="size-4" />
             </Button>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function SquadHeader({
+  eyebrow,
+  title,
+  subtitle,
+}: {
+  eyebrow: string;
+  title: string;
+  subtitle: string;
+}) {
+  return (
+    <div>
+      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--rosso-light)]">
+        {eyebrow}
+      </p>
+      <h1 className="font-heading text-3xl font-extrabold">{title}</h1>
+      <p className="max-w-xl text-sm font-medium text-muted-foreground">
+        {subtitle}
+      </p>
     </div>
   );
 }
@@ -213,17 +431,18 @@ export default function SquadPage() {
 function MemberCard({
   member,
   rank,
-  onUpdate,
-  onRemove,
+  isYou,
 }: {
-  member: SquadMember;
+  member: MemberWithActivity;
   rank: number;
-  onUpdate: (patch: Partial<SquadMember>) => void;
-  onRemove: () => void;
+  isYou: boolean;
 }) {
-  const [editOpen, setEditOpen] = useState(false);
-  const pct = Math.min(100, (member.kcal_in / Math.max(1, member.calorie_goal)) * 100);
-  const remaining = Math.max(0, member.calorie_goal - member.kcal_in);
+  const activity = member.activity;
+  const burned = activity?.kcal_out_activity ?? 0;
+  const kcalIn = activity?.kcal_in ?? 0;
+  const meals = activity?.meals_count ?? 0;
+  const workouts = activity?.workouts_count ?? 0;
+  const streak = activity?.streak ?? 0;
 
   return (
     <motion.div
@@ -238,65 +457,45 @@ function MemberCard({
               className="flex size-12 items-center justify-center rounded-2xl font-heading text-lg font-bold text-white"
               style={{ background: member.color }}
             >
-              {rank === 1 ? <Crown className="size-6" /> : member.name.slice(0, 2).toUpperCase()}
+              {rank === 1 ? (
+                <Crown className="size-6" />
+              ) : (
+                member.display_name.slice(0, 2).toUpperCase()
+              )}
             </div>
-            <div className="flex-1">
-              <div className="flex items-center justify-between">
-                <p className="font-heading text-base font-bold">{member.name}</p>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2">
+                <p className="truncate font-heading text-base font-bold">
+                  {member.display_name}
+                  {isYou && (
+                    <span className="ml-2 rounded-full bg-white/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                      you
+                    </span>
+                  )}
+                </p>
                 <div className="flex items-center gap-1 text-[var(--rosso-light)]">
                   <Flame className="size-3.5" />
-                  <span className="text-xs font-semibold">{member.streak}</span>
+                  <span className="text-xs font-semibold">{streak}</span>
                 </div>
               </div>
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
-                <motion.div
-                  className="h-full rounded-full"
-                  style={{ background: member.color }}
-                  initial={{ width: 0 }}
-                  animate={{ width: `${pct}%` }}
-                  transition={{ duration: 0.5, ease: "easeOut" as const }}
+              <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                <StatPill
+                  icon={<Dumbbell className="size-3.5" />}
+                  label="Burned"
+                  value={`${Math.round(burned)} kcal`}
                 />
-              </div>
-              <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
-                <span>
-                  {Math.round(member.kcal_in)} / {member.calorie_goal} kcal
-                </span>
-                <span>{Math.round(remaining)} left</span>
+                <StatPill
+                  icon={<Utensils className="size-3.5" />}
+                  label="Meals"
+                  value={`${meals} / ${Math.round(kcalIn)} kcal`}
+                />
+                <StatPill
+                  icon={<Flame className="size-3.5" />}
+                  label="Workouts"
+                  value={String(workouts)}
+                />
               </div>
             </div>
-          </div>
-
-          <div className="mt-3 flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-1"
-              onClick={() => setEditOpen(true)}
-            >
-              Update progress
-            </Button>
-            <Dialog open={editOpen} onOpenChange={setEditOpen}>
-              <DialogTrigger className="hidden" />
-              <DialogContent className="rounded-[1.8rem] border-white/7 bg-[var(--smoke)]">
-                <DialogHeader>
-                  <DialogTitle className="font-heading">Update {member.name}</DialogTitle>
-                </DialogHeader>
-                <EditForm
-                  member={member}
-                  onSave={(patch) => {
-                    onUpdate(patch);
-                    setEditOpen(false);
-                    toast.success(`${member.name} updated`);
-                  }}
-                />
-              </DialogContent>
-            </Dialog>
-            <button
-              onClick={onRemove}
-              className="flex items-center justify-center rounded-lg border border-white/10 px-3 text-muted-foreground hover:text-[var(--over)]"
-            >
-              <Trash2 className="size-4" />
-            </button>
           </div>
         </CardContent>
       </Card>
@@ -304,73 +503,49 @@ function MemberCard({
   );
 }
 
-function EditForm({
-  member,
-  onSave,
+function StatPill({
+  icon,
+  label,
+  value,
 }: {
-  member: SquadMember;
-  onSave: (patch: Partial<SquadMember>) => void;
+  icon: React.ReactNode;
+  label: string;
+  value: string;
 }) {
-  const [kcalIn, setKcalIn] = useState(String(member.kcal_in));
-  const [kcalOut, setKcalOut] = useState(String(member.kcal_out));
-  const [goal, setGoal] = useState(String(member.calorie_goal));
-  const [streak, setStreak] = useState(String(member.streak));
-
   return (
-    <div className="space-y-3 pt-2">
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-2">
-          <Label htmlFor="kcal-in">Calories in</Label>
-          <Input
-            id="kcal-in"
-            type="number"
-            value={kcalIn}
-            onChange={(e) => setKcalIn(e.target.value)}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="kcal-out">Calories out</Label>
-          <Input
-            id="kcal-out"
-            type="number"
-            value={kcalOut}
-            onChange={(e) => setKcalOut(e.target.value)}
-          />
-        </div>
+    <div className="rounded-2xl border border-white/7 bg-white/[0.035] px-2.5 py-2">
+      <div className="flex items-center gap-1 text-muted-foreground">
+        {icon}
+        <span>{label}</span>
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-2">
-          <Label htmlFor="goal">Goal</Label>
-          <Input
-            id="goal"
-            type="number"
-            value={goal}
-            onChange={(e) => setGoal(e.target.value)}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="streak">Streak</Label>
-          <Input
-            id="streak"
-            type="number"
-            value={streak}
-            onChange={(e) => setStreak(e.target.value)}
-          />
-        </div>
-      </div>
-      <Button
-        onClick={() =>
-          onSave({
-            kcal_in: Number(kcalIn),
-            kcal_out: Number(kcalOut),
-            calorie_goal: Number(goal),
-            streak: Number(streak),
-          })
+      <p className="mt-1 font-semibold text-foreground">{value}</p>
+    </div>
+  );
+}
+
+function MessageBubble({
+  message,
+  member,
+  isYou,
+}: {
+  message: SquadMessageRow;
+  member?: SquadMemberRow;
+  isYou: boolean;
+}) {
+  return (
+    <div className={isYou ? "flex justify-end" : "flex justify-start"}>
+      <div
+        className={
+          isYou
+            ? "max-w-[82%] rounded-2xl bg-[var(--rosso)] px-4 py-3 text-white"
+            : "max-w-[82%] rounded-2xl border border-white/7 bg-white/[0.045] px-4 py-3"
         }
-        className="w-full bg-[var(--rosso)] text-white hover:bg-[var(--rosso)]/90"
       >
-        Save
-      </Button>
+        <p className="text-[11px] font-bold uppercase tracking-[0.15em] opacity-70">
+          {member?.display_name ?? "Racer"}
+        </p>
+        <p className="mt-1 text-sm">{message.body}</p>
+      </div>
     </div>
   );
 }
