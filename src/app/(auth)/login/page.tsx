@@ -6,7 +6,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { motion } from "framer-motion";
 import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
@@ -110,10 +109,7 @@ export default function LoginPage() {
           </div>
         </CardContent>
         <CardFooter className="mt-2 flex-col gap-3">
-          <motion.div
-            whileTap={{ scale: 0.97 }}
-            className="w-full"
-          >
+          <div className="w-full transition-transform active:scale-[0.97]">
             <Button
               type="submit"
               className="w-full bg-[var(--rosso)] font-semibold text-white hover:bg-[var(--rosso)]/90"
@@ -121,7 +117,7 @@ export default function LoginPage() {
             >
               {isSubmitting ? "Burning in…" : "Log in"}
             </Button>
-          </motion.div>
+          </div>
           <p className="text-sm text-muted-foreground">
             No account?{" "}
             <Link

@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, Plus, BarChart3, Utensils, Dumbbell, Users, Bell } from "lucide-react";
-import { motion } from "framer-motion";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
 import { Wordmark } from "@/components/brand/wordmark";
@@ -74,13 +73,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             className="group pointer-events-auto flex w-fit items-center"
             aria-label="Quick log"
           >
-            <motion.span
-              whileTap={{ scale: 0.88 }}
-              className="flex h-14 w-14 items-center justify-center rounded-full bg-[linear-gradient(145deg,var(--rosso-light),var(--rosso-dark))] text-white rosso-glow ring-4 ring-black/45"
+            <span
+              className="flex h-14 w-14 items-center justify-center rounded-full bg-[linear-gradient(145deg,var(--rosso-light),var(--rosso-dark))] text-white rosso-glow ring-4 ring-black/45 transition-transform active:scale-[0.88]"
               style={{ height: "3.5rem", width: "3.5rem" }}
             >
               <Plus className="size-7" strokeWidth={2.5} />
-            </motion.span>
+            </span>
           </Link>
         </div>
       )}

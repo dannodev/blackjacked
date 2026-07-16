@@ -1,12 +1,21 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FoodLog } from "@/components/log/food-log";
-import { AiFoodLog } from "@/components/log/ai-food-log";
 import { useSearchParams } from "next/navigation";
 
 type Tab = "menu" | "ai" | "search";
+
+const FoodLog = dynamic(
+  () => import("@/components/log/food-log").then((module) => module.FoodLog),
+  { loading: () => <LogPanelSkeleton />, ssr: false },
+);
+
+const AiFoodLog = dynamic(
+  () => import("@/components/log/ai-food-log").then((module) => module.AiFoodLog),
+  { loading: () => <LogPanelSkeleton />, ssr: false },
+);
 
 export default function LogPage() {
   const params = useSearchParams();
@@ -38,6 +47,19 @@ export default function LogPage() {
           {tab === "search" && <FoodLog mode="search" />}
         </div>
       </Tabs>
+    </div>
+  );
+}
+
+function LogPanelSkeleton() {
+  return (
+    <div className="space-y-3 rounded-[1.5rem] border border-white/8 bg-white/[0.035] p-4">
+      <div className="h-4 w-1/3 animate-pulse rounded-full bg-white/10" />
+      <div className="h-24 animate-pulse rounded-3xl bg-white/[0.06]" />
+      <div className="grid grid-cols-2 gap-3">
+        <div className="h-12 animate-pulse rounded-2xl bg-white/[0.06]" />
+        <div className="h-12 animate-pulse rounded-2xl bg-white/[0.06]" />
+      </div>
     </div>
   );
 }

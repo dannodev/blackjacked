@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
 import { useTodayData, sortToday } from "@/lib/use-today-data";
@@ -29,15 +28,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-
-const stagger = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.06 } },
-};
-const item = {
-  hidden: { opacity: 0, y: 12 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" as const } },
-};
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -107,14 +97,9 @@ export default function DashboardPage() {
   }
 
   return (
-    <motion.div
-      variants={stagger}
-      initial="hidden"
-      animate="show"
-      className="space-y-5"
-    >
+    <div className="dashboard-stagger space-y-5">
       {/* daily header */}
-      <motion.div variants={item} className="flex items-center justify-between pt-1">
+      <div className="dashboard-item flex items-center justify-between pt-1">
         <div className="flex items-center gap-3">
           <Avatar className="size-12 border border-white/10 bg-[var(--rosso)]/12 shadow-[0_0_26px_rgba(244,63,63,0.12)]">
             <AvatarFallback className="bg-transparent text-sm font-extrabold text-[var(--rosso-light)]">
@@ -136,10 +121,10 @@ export default function DashboardPage() {
           <Flame className="size-4" />
           <span className="font-bold">{streaks.current_streak}</span>
         </div>
-      </motion.div>
+      </div>
 
       {/* hero stats card with ring */}
-      <motion.div variants={item}>
+      <div className="dashboard-item">
         <Card className="premium-panel chart-grid relative overflow-hidden rounded-[2rem]">
           <div className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-[var(--rosso)]/15 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-24 left-10 h-48 w-48 rounded-full bg-[var(--ember)]/10 blur-3xl" />
@@ -204,11 +189,11 @@ export default function DashboardPage() {
             </div>
           </CardContent>
         </Card>
-      </motion.div>
+      </div>
 
       {/* today's recommendation */}
       {recommendation && !loggedMealNames.has(recommendation.name) && (
-        <motion.div variants={item}>
+        <div className="dashboard-item">
           <div className="mb-2 flex items-center gap-2">
             <Sparkles className="size-4 text-[var(--rosso-light)]" />
             <h2 className="font-heading text-sm font-bold">Recommended next meal</h2>
@@ -226,21 +211,20 @@ export default function DashboardPage() {
                   <span className="text-muted-foreground"> · P{recommendation.protein_g}g C{recommendation.carb_g}g F{recommendation.fat_g}g</span>
                 </p>
               </div>
-              <motion.button
-                whileTap={{ scale: 0.9 }}
+              <button
                 onClick={quickLogRecommendation}
-                className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--rosso)] text-white rosso-glow"
+                className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--rosso)] text-white rosso-glow transition-transform active:scale-90"
                 aria-label="Log recommended meal"
               >
                 <Check className="size-5" strokeWidth={2.5} />
-              </motion.button>
+              </button>
             </CardContent>
           </Card>
-        </motion.div>
+        </div>
       )}
 
       {/* current meal options */}
-      <motion.div variants={item}>
+      <div className="dashboard-item">
         <div className="mb-2 flex items-center justify-between">
           <div>
             <h2 className="font-heading text-sm font-bold">
@@ -287,7 +271,7 @@ export default function DashboardPage() {
             </Link>
           )}
         </div>
-      </motion.div>
+      </div>
 
       <Dialog
         open={Boolean(selectedMenuMeal)}
@@ -326,7 +310,7 @@ export default function DashboardPage() {
       </Dialog>
 
       {/* next workout teaser */}
-      <motion.div variants={item}>
+      <div className="dashboard-item">
         <div className="mb-2 flex items-center justify-between">
           <h2 className="font-heading text-sm font-bold">Next workout</h2>
           <Link
@@ -360,10 +344,10 @@ export default function DashboardPage() {
             </Link>
           </CardContent>
         </Card>
-      </motion.div>
+      </div>
 
       {/* hydration + sleep */}
-      <motion.div variants={item} className="grid grid-cols-2 gap-3">
+      <div className="dashboard-item grid grid-cols-2 gap-3">
         <Card className="carbon-card rounded-[1.35rem] border-white/7">
           <CardContent className="py-3.5">
             <div className="mb-1.5 flex items-center gap-2">
@@ -410,10 +394,10 @@ export default function DashboardPage() {
             </div>
           </CardContent>
         </Card>
-      </motion.div>
+      </div>
 
       {/* recent meals */}
-      <motion.div variants={item}>
+      <div className="dashboard-item">
         <div className="mb-2 flex items-center justify-between">
           <h2 className="font-heading text-sm font-bold">My meals</h2>
           <Link
@@ -443,10 +427,10 @@ export default function DashboardPage() {
             ))}
           </div>
         )}
-      </motion.div>
+      </div>
 
       {/* recent workouts */}
-      <motion.div variants={item}>
+      <div className="dashboard-item">
         <div className="mb-2 mt-4 flex items-center justify-between">
           <h2 className="font-heading text-sm font-bold">Workouts</h2>
           <Link
@@ -501,8 +485,8 @@ export default function DashboardPage() {
             ))}
           </div>
         )}
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   );
 }
 
@@ -528,12 +512,9 @@ function MacroPill({
         <span className="ml-0.5 text-[9px] text-muted-foreground">{unit}</span>
       </p>
       <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10">
-        <motion.div
-          className="h-full rounded-full"
-          style={{ background: color }}
-          initial={{ width: 0 }}
-          animate={{ width: `${pct}%` }}
-          transition={{ duration: 0.5, ease: "easeOut" as const }}
+        <div
+          className="macro-progress h-full rounded-full"
+          style={{ background: color, width: `${pct}%` }}
         />
       </div>
     </div>

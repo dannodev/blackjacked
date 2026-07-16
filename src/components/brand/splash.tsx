@@ -1,6 +1,5 @@
 "use client";
 
-import { motion } from "framer-motion";
 import Image from "next/image";
 import { Wordmark } from "./wordmark";
 
@@ -23,12 +22,7 @@ export function BrandSplash({ fullScreen = false }: { fullScreen?: boolean }) {
           }}
         />
       )}
-      <motion.div
-        initial={{ scale: 0.8, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: "spring", stiffness: 180, damping: 18 }}
-        className="relative h-28 w-28"
-      >
+      <div className="brand-splash-pop relative h-28 w-28">
         <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90">
           <circle
             cx="60"
@@ -38,7 +32,7 @@ export function BrandSplash({ fullScreen = false }: { fullScreen?: boolean }) {
             stroke="rgba(255,255,255,0.08)"
             strokeWidth="8"
           />
-          <motion.circle
+          <circle
             cx="60"
             cy="60"
             r="52"
@@ -47,18 +41,12 @@ export function BrandSplash({ fullScreen = false }: { fullScreen?: boolean }) {
             strokeWidth="8"
             strokeLinecap="round"
             strokeDasharray={2 * Math.PI * 52}
-            initial={{ strokeDashoffset: 2 * Math.PI * 52 }}
-            animate={{ strokeDashoffset: 0 }}
-            transition={{ duration: 1.1, ease: "easeInOut" as const }}
+            strokeDashoffset={2 * Math.PI * 52}
+            className="brand-splash-ring"
             style={{ filter: "drop-shadow(0 0 10px rgba(212,0,0,0.4))" }}
           />
         </svg>
-        <motion.div
-          initial={{ opacity: 0, scale: 0.6 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.5, type: "spring", stiffness: 200, damping: 14 }}
-          className="absolute inset-0 flex items-center justify-center"
-        >
+        <div className="brand-splash-logo absolute inset-0 flex items-center justify-center">
           <Image
             src="/blackjacked-logo.png"
             alt="BlackJacked"
@@ -67,25 +55,15 @@ export function BrandSplash({ fullScreen = false }: { fullScreen?: boolean }) {
             className="h-14 w-14 object-contain drop-shadow-[0_0_14px_rgba(212,0,0,0.5)]"
             priority
           />
-        </motion.div>
-      </motion.div>
+        </div>
+      </div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.6, duration: 0.4 }}
-        className="mt-5"
-      >
+      <div className="brand-splash-wordmark mt-5">
         <Wordmark size="text-2xl" />
-      </motion.div>
-      <motion.p
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.85, duration: 0.4 }}
-        className="mt-1.5 text-xs tracking-wide text-muted-foreground"
-      >
+      </div>
+      <p className="brand-splash-tagline mt-1.5 text-xs tracking-wide text-muted-foreground">
         burn the deficit.
-      </motion.p>
+      </p>
     </div>
   );
 }

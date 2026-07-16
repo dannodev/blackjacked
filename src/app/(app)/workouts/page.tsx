@@ -1,10 +1,15 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { Dumbbell, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { ExerciseLogForm } from "@/components/log/exercise-log";
 import { Card, CardContent } from "@/components/ui/card";
 import { useStore } from "@/lib/store";
+
+const ExerciseLogForm = dynamic(
+  () => import("@/components/log/exercise-log").then((module) => module.ExerciseLogForm),
+  { loading: () => <WorkoutFormSkeleton />, ssr: false },
+);
 
 export default function WorkoutsPage() {
   const exerciseLogs = useStore((s) => s.exerciseLogs);
@@ -76,6 +81,23 @@ export default function WorkoutsPage() {
             </Card>
           ))
         )}
+      </div>
+    </div>
+  );
+}
+
+function WorkoutFormSkeleton() {
+  return (
+    <div className="space-y-3 rounded-[1.5rem] border border-white/8 bg-white/[0.035] p-4">
+      <div className="flex gap-2 overflow-hidden">
+        <div className="h-8 w-16 animate-pulse rounded-full bg-white/10" />
+        <div className="h-8 w-20 animate-pulse rounded-full bg-white/10" />
+        <div className="h-8 w-24 animate-pulse rounded-full bg-white/10" />
+      </div>
+      <div className="h-11 animate-pulse rounded-2xl bg-white/[0.06]" />
+      <div className="grid grid-cols-2 gap-3">
+        <div className="h-24 animate-pulse rounded-3xl bg-white/[0.06]" />
+        <div className="h-24 animate-pulse rounded-3xl bg-white/[0.06]" />
       </div>
     </div>
   );

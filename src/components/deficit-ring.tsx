@@ -1,7 +1,6 @@
 "use client";
 
-import { motion, useMotionValue, useTransform, animate } from "framer-motion";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ringState } from "@/lib/types";
 
 const R = 88;
@@ -26,23 +25,13 @@ export function DeficitRing({
   const consumed = Math.max(0, goal - remaining);
   const fraction = Math.min(1, goal > 0 ? consumed / goal : 1);
   const { color, label } = ringState(remaining, goal);
-  const dashoffset = useMotionValue(CIRC);
-  const displayRemaining = useMotionValue(0);
+  const targetDashoffset = CIRC * (1 - fraction);
+  const [dashoffset, setDashoffset] = useState(CIRC);
 
   useEffect(() => {
-    const controls = animate(dashoffset, CIRC * (1 - fraction), {
-      duration: 0.8,
-      ease: "easeOut" as const,
-    });
-    const numControls = animate(displayRemaining, remaining, {
-      duration: 0.8,
-      ease: "easeOut" as const,
-    });
-    return () => {
-      controls.stop();
-      numControls.stop();
-    };
-  }, [fraction, remaining, dashoffset, displayRemaining]);
+    const frame = requestAnimationFrame(() => setDashoffset(targetDashoffset));
+    return () => cancelAnimationFrame(frame);
+  }, [targetDashoffset]);
 
   const dim = size === "lg" ? 238 : 190;
 
@@ -64,7 +53,7 @@ export function DeficitRing({
           stroke="rgba(255,255,255,0.075)"
           strokeWidth="12"
         />
-        <motion.circle
+        <circle
           cx="100"
           cy="100"
           r={R}
@@ -73,13 +62,14 @@ export function DeficitRing({
           strokeWidth="12"
           strokeLinecap="round"
           strokeDasharray={CIRC}
+          className="deficit-ring-progress"
           style={{ strokeDashoffset: dashoffset, filter: `drop-shadow(0 0 10px ${color}66)` }}
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <motion.span className="font-heading text-5xl font-extrabold tracking-normal text-foreground">
+        <span className="font-heading text-5xl font-extrabold tracking-normal text-foreground">
           <AnimatedNumber value={remaining} />
-        </motion.span>
+        </span>
         <span className="mt-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           kcal left
         </span>
@@ -101,13 +91,29 @@ export function DeficitRing({
 }
 
 function AnimatedNumber({ value }: { value: number }) {
-  const mv = useMotionValue(0);
-  const text = useTransform(mv, (v) => Math.round(v).toLocaleString());
+  const [display, setDisplay] = useState(value);
+  const displayRef = useRef(value);
+
   useEffect(() => {
-    const c = animate(mv, value, { duration: 0.8, ease: "easeOut" as const });
-    return () => c.stop();
-  }, [value, mv]);
-  return <motion.span>{text}</motion.span>;
+    const from = displayRef.current;
+    const start = performance.now();
+    const duration = 800;
+    let frame = 0;
+
+    function tick(now: number) {
+      const t = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      const next = from + (value - from) * eased;
+      displayRef.current = next;
+      setDisplay(next);
+      if (t < 1) frame = requestAnimationFrame(tick);
+    }
+
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [value]);
+
+  return <span>{Math.round(display).toLocaleString()}</span>;
 }
 
 function Stat({ label, value }: { label: string; value: number }) {
