@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import dynamic from "next/dynamic";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { computeDay, dateKey, normalizeGoal } from "@/lib/types";
@@ -13,6 +13,15 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Camera, Droplets, Moon, Scale, Target, TrendingDown } from "lucide-react";
+
+type StatsRange = "week" | "month" | "year" | "all";
+
+const RANGE_LABELS: Record<StatsRange, string> = {
+  week: "Week",
+  month: "Month",
+  year: "Year",
+  all: "All time",
+};
 
 const WeightTrendChart = dynamic(
   () => import("./stats-charts").then((mod) => mod.WeightTrendChart),
@@ -30,16 +39,19 @@ const WellnessChart = dynamic(
 );
 
 export default function StatsPage() {
+  const [range, setRange] = useState<StatsRange>("week");
   const profile = useStore((s) => s.profile)!;
   const weightLogs = useStore((s) => s.weightLogs);
   const meals = useStore((s) => s.meals);
   const exerciseLogs = useStore((s) => s.exerciseLogs);
   const dailySummaries = useStore((s) => s.dailySummaries);
 
-  // weight chart data
+  const dateWindow = useMemo(() => getDateWindow(range), [range]);
+
   const weightData = useMemo(
     () =>
       [...weightLogs]
+        .filter((w) => isInDateWindow(w.loggedAt.slice(0, 10), dateWindow))
         .sort((a, b) => +new Date(a.loggedAt) - +new Date(b.loggedAt))
         .map((w) => ({
           date: new Date(w.loggedAt).toLocaleDateString(undefined, {
@@ -48,7 +60,7 @@ export default function StatsPage() {
           }),
           weight: w.weight_kg,
         })),
-    [weightLogs],
+    [dateWindow, weightLogs],
   );
 
   const deficitData = useMemo(() => {
@@ -70,16 +82,18 @@ export default function StatsPage() {
       else exerciseByDate.set(key, [exercise]);
     }
 
-    const keys = new Set<string>(summaryByDate.keys());
+    const keys = new Set<string>();
+    for (const key of summaryByDate.keys()) {
+      if (isInDateWindow(key, dateWindow)) keys.add(key);
+    }
     for (const meal of meals) keys.add(meal.loggedAt.slice(0, 10));
     for (const exercise of exerciseLogs) keys.add(exercise.loggedAt.slice(0, 10));
+    for (const key of [...keys]) {
+      if (!isInDateWindow(key, dateWindow)) keys.delete(key);
+    }
 
     if (keys.size === 0) {
-      for (let i = 29; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        keys.add(dateKey(d));
-      }
+      for (const key of fallbackDateKeys(dateWindow, range)) keys.add(key);
     }
 
     return [...keys].sort().map((key) => {
@@ -96,21 +110,20 @@ export default function StatsPage() {
         kcal_in: Math.round(summary?.kcal_in ?? day.kcal_in),
       };
     });
-  }, [dailySummaries, meals, exerciseLogs, profile]);
+  }, [dailySummaries, dateWindow, exerciseLogs, meals, profile, range]);
 
   const waterGoalMl = recommendedWaterMl(profile.current_weight_kg);
   const sleepGoalHours = recommendedSleepHours(profile);
   const goal = normalizeGoal(profile);
   const wellnessData = useMemo(() => {
     const summaryByDate = new Map(dailySummaries.map((summary) => [summary.date, summary]));
-    const keys = new Set<string>(summaryByDate.keys());
+    const keys = new Set<string>();
+    for (const key of summaryByDate.keys()) {
+      if (isInDateWindow(key, dateWindow)) keys.add(key);
+    }
 
     if (keys.size === 0) {
-      for (let i = 29; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-        keys.add(dateKey(d));
-      }
+      for (const key of fallbackDateKeys(dateWindow, range)) keys.add(key);
     }
 
     const days: {
@@ -136,7 +149,7 @@ export default function StatsPage() {
     }
 
     return days;
-  }, [dailySummaries, sleepGoalHours, waterGoalMl]);
+  }, [dailySummaries, dateWindow, range, sleepGoalHours, waterGoalMl]);
 
   const weightChange = weightData.length > 1
     ? +(weightData[weightData.length - 1].weight - weightData[0].weight).toFixed(1)
@@ -145,9 +158,17 @@ export default function StatsPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="font-heading text-3xl font-extrabold">Stats</h1>
-        <p className="text-sm font-medium text-muted-foreground">
-          Deficit, check-ins, water, and sleep history
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="font-heading text-3xl font-extrabold">Stats</h1>
+            <p className="text-sm font-medium text-muted-foreground">
+              Deficit, check-ins, water, and sleep history
+            </p>
+          </div>
+          <RangeMenu value={range} onChange={setRange} />
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Week view uses ISO weeks: Monday to Sunday.
         </p>
       </div>
 
@@ -314,6 +335,94 @@ function recommendedWaterMl(weightKg: number) {
   return Math.round(Math.max(1800, Math.min(4200, weightKg * 35)) / 250) * 250;
 }
 
+function getDateWindow(range: StatsRange) {
+  if (range === "all") return { start: null as string | null, end: null as string | null };
+
+  const now = new Date();
+  const end = new Date(now);
+  end.setHours(23, 59, 59, 999);
+  const start = new Date(now);
+
+  if (range === "week") {
+    const day = start.getDay();
+    const diffToMonday = (day + 6) % 7;
+    start.setDate(start.getDate() - diffToMonday);
+  } else if (range === "month") {
+    start.setDate(1);
+  } else {
+    start.setMonth(0, 1);
+  }
+
+  start.setHours(0, 0, 0, 0);
+  return { start: dateKey(start), end: dateKey(end) };
+}
+
+function isInDateWindow(key: string, window: { start: string | null; end: string | null }) {
+  if (window.start && key < window.start) return false;
+  if (window.end && key > window.end) return false;
+  return true;
+}
+
+function fallbackDateKeys(
+  window: { start: string | null; end: string | null },
+  range: StatsRange,
+) {
+  const keys: string[] = [];
+  if (window.start && window.end) {
+    const cursor = new Date(`${window.start}T12:00:00`);
+    const end = new Date(`${window.end}T12:00:00`);
+    while (cursor <= end) {
+      keys.push(dateKey(cursor));
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return keys;
+  }
+
+  const fallbackDays = range === "all" ? 30 : 7;
+  for (let i = fallbackDays - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    keys.push(dateKey(d));
+  }
+  return keys;
+}
+
+function RangeMenu({
+  value,
+  onChange,
+}: {
+  value: StatsRange;
+  onChange: (value: StatsRange) => void;
+}) {
+  return (
+    <details className="relative shrink-0">
+      <summary className="list-none rounded-full border border-white/10 bg-white/[0.045] px-3 py-2 text-xs font-semibold text-[var(--rosso-light)] marker:hidden">
+        {RANGE_LABELS[value]}
+      </summary>
+      <div className="absolute right-0 z-30 mt-2 w-36 rounded-2xl border border-white/10 bg-[#111114] p-1.5 shadow-[0_18px_50px_rgba(0,0,0,0.5)]">
+        {(["week", "month", "year", "all"] as const).map((option) => (
+          <button
+            key={option}
+            type="button"
+            className={
+              "w-full rounded-xl px-3 py-2 text-left text-xs font-semibold transition-colors " +
+              (value === option
+                ? "bg-[var(--rosso)]/12 text-[var(--rosso-light)]"
+                : "text-muted-foreground hover:bg-white/[0.06] hover:text-foreground")
+            }
+            onClick={(event) => {
+              onChange(option);
+              event.currentTarget.closest("details")?.removeAttribute("open");
+            }}
+          >
+            {RANGE_LABELS[option]}
+          </button>
+        ))}
+      </div>
+    </details>
+  );
+}
+
 function recommendedSleepHours(profile: { birthdate: string }) {
   const age = Math.floor(
     (Date.now() - new Date(profile.birthdate).getTime()) / 31_557_600_000,
@@ -332,7 +441,7 @@ function waterRecommendation(
   goalMl: number,
 ) {
   const logged = data.filter((day) => day.water_l > 0);
-  if (logged.length === 0) return "Start logging water from Today.";
+  if (logged.length === 0) return "";
   const averageMl =
     (logged.reduce((sum, day) => sum + day.water_l, 0) / logged.length) * 1000;
   if (averageMl >= goalMl) return "You are hitting hydration well.";
@@ -344,7 +453,7 @@ function sleepRecommendation(
   goalHours: number,
 ) {
   const logged = data.filter((day) => day.sleep_hours > 0);
-  if (logged.length === 0) return "Start logging sleep from Today.";
+  if (logged.length === 0) return "";
   const averageHours =
     logged.reduce((sum, day) => sum + day.sleep_hours, 0) / logged.length;
   if (averageHours >= goalHours) return "Sleep is on target.";
@@ -369,7 +478,7 @@ function RecommendationCard({
         {label}
       </div>
       <p className="font-heading text-lg font-bold">{value}</p>
-      <p className="mt-1 text-xs text-muted-foreground">{text}</p>
+      {text && <p className="mt-1 text-xs text-muted-foreground">{text}</p>}
     </div>
   );
 }
