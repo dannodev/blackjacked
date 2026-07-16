@@ -128,7 +128,7 @@ export function ExerciseLogForm() {
             className={cn(
               "whitespace-nowrap rounded-full border px-3 py-1.5 text-xs capitalize transition-colors",
               cat === c
-                ? "border-[var(--lime)] bg-[var(--lime)]/10 text-[var(--lime)]"
+                ? "border-[var(--rosso)] bg-[var(--rosso)]/10 text-[var(--rosso)]"
                 : "border-white/10 text-muted-foreground",
             )}
           >
@@ -151,7 +151,7 @@ export function ExerciseLogForm() {
             variant="outline"
             onClick={aiMatch}
             disabled={aiLoading}
-            className="border-[var(--lime)]/30 text-[var(--lime)]"
+            className="border-[var(--rosso)]/30 text-[var(--rosso)]"
           >
             {aiLoading ? (
               <Loader2 className="size-4 animate-spin" />
@@ -221,9 +221,9 @@ export function ExerciseLogForm() {
                   />
                 </Field>
               )}
-              <div className="flex items-center justify-between rounded-xl bg-[var(--lime)]/10 px-3 py-2.5">
+              <div className="flex items-center justify-between rounded-xl bg-[var(--rosso)]/10 px-3 py-2.5">
                 <span className="text-sm">Estimated burn</span>
-                <span className="font-heading text-lg font-bold text-[var(--lime)]">
+                <span className="font-heading text-lg font-bold text-[var(--rosso)]">
                   {Math.round(kcal)} kcal
                 </span>
               </div>
@@ -236,7 +236,7 @@ export function ExerciseLogForm() {
                   Cancel
                 </Button>
                 <Button
-                  className="flex-1 bg-[var(--lime)] text-[var(--ink)] font-semibold hover:bg-[var(--lime)]/90"
+                  className="flex-1 bg-[var(--rosso)] text-white font-semibold hover:bg-[var(--rosso)]/90"
                   onClick={log}
                 >
                   Log it
@@ -260,7 +260,7 @@ export function ExerciseLogForm() {
                   {CATEGORY_LABELS[e.category]} · {e.mets} MET
                 </p>
               </div>
-              <Plus className="size-4 text-[var(--lime)]" />
+              <Plus className="size-4 text-[var(--rosso)]" />
             </button>
           ))}
           {list.length === 0 && (

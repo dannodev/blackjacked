@@ -72,7 +72,7 @@ export default function CheckInPage() {
       <Card className="rounded-2xl border-white/5 bg-card/60 backdrop-blur-xl">
         <CardHeader>
           <CardTitle className="font-heading text-base flex items-center gap-2">
-            <Scale className="size-4 text-[var(--lime)]" />
+            <Scale className="size-4 text-[var(--rosso)]" />
             This week
           </CardTitle>
         </CardHeader>
@@ -137,7 +137,7 @@ export default function CheckInPage() {
           {/* photo */}
           <div className="space-y-2">
             <Label className="text-xs">Progress photo (optional)</Label>
-            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-white/15 px-4 py-6 text-sm text-muted-foreground transition-colors hover:border-[var(--lime)]/40">
+            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-white/15 px-4 py-6 text-sm text-muted-foreground transition-colors hover:border-[var(--rosso)]/40">
               <Camera className="size-5" />
               {photoUrl ? "Photo selected" : "Tap to upload"}
               <input type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
@@ -153,7 +153,7 @@ export default function CheckInPage() {
 
           <Button
             onClick={save}
-            className="w-full bg-[var(--lime)] text-[var(--ink)] font-semibold hover:bg-[var(--lime)]/90"
+            className="w-full bg-[var(--rosso)] text-white font-semibold hover:bg-[var(--rosso)]/90"
           >
             Save check-in
           </Button>

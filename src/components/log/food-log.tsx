@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { useStore, useAllFoods } from "@/lib/store";
 import type { FoodItem, Meal, MealItem, MealType } from "@/lib/types";
 import { MEAL_LABELS } from "@/lib/types";
+import { MENU_MEAL_PRESETS, getTodayMeals, type MenuMealPreset } from "@/lib/menu-meals";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -14,7 +15,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Plus, Search, X } from "lucide-react";
+import { Plus, Search, X, Utensils, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const MEAL_TYPES: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
@@ -31,7 +32,171 @@ function inferMealType(): MealType {
   return "dinner";
 }
 
+type SubTab = "menu" | "search" | "custom";
+
 export function FoodLog() {
+  const [subtab, setSubtab] = useState<SubTab>("menu");
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-1.5 rounded-2xl bg-white/5 p-1">
+        <SubTabBtn active={subtab === "menu"} onClick={() => setSubtab("menu")} icon={<Utensils className="size-3.5" />}>
+          Today&apos;s Menu
+        </SubTabBtn>
+        <SubTabBtn active={subtab === "search"} onClick={() => setSubtab("search")}>
+          Search Foods
+        </SubTabBtn>
+      </div>
+
+      {subtab === "menu" && <MenuMealsLog />}
+      {subtab === "search" && <SearchFoodsLog />}
+    </div>
+  );
+}
+
+function SubTabBtn({
+  active,
+  onClick,
+  children,
+  icon,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  icon?: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-semibold transition-all",
+        active
+          ? "bg-[var(--rosso)] text-white shadow-sm"
+          : "text-muted-foreground hover:text-foreground",
+      )}
+    >
+      {icon}
+      {children}
+    </button>
+  );
+}
+
+/* ============ Menu Meals (from PDF) ============ */
+function MenuMealsLog() {
+  const addMeal = useStore((s) => s.addMeal);
+  const profile = useStore((s) => s.profile)!;
+  const todayMeals = getTodayMeals();
+  const [logged, setLogged] = useState<Set<string>>(new Set());
+
+  function logPreset(preset: MenuMealPreset) {
+    const meal: Meal = {
+      id: crypto.randomUUID(),
+      type: preset.type,
+      loggedAt: nowTime(),
+      total_kcal: preset.kcal,
+      p: preset.protein_g,
+      f: preset.fat_g,
+      c: preset.carb_g,
+      items: [
+        {
+          food_item_id: preset.id,
+          name: preset.name,
+          quantity: 1,
+          unit: "serving",
+          kcal: preset.kcal,
+          protein_g: preset.protein_g,
+          fat_g: preset.fat_g,
+          carb_g: preset.carb_g,
+        },
+      ],
+    };
+    addMeal(meal);
+    setLogged((s) => new Set([...s, preset.id]));
+    toast.success(`${preset.name} logged`, {
+      description: `${preset.kcal} kcal · P${preset.protein_g}g C${preset.carb_g}g F${preset.fat_g}g`,
+    });
+  }
+
+  if (todayMeals.length === 0) {
+    return (
+      <Card className="rounded-2xl border-dashed border-white/10 bg-card/40">
+        <CardContent className="flex flex-col items-center gap-3 py-8 text-center">
+          <div className="flex size-12 items-center justify-center rounded-2xl bg-[var(--rosso)]/10 text-[var(--rosso)]">
+            <Utensils className="size-6" />
+          </div>
+          <p className="max-w-xs text-sm text-muted-foreground">
+            No meals mapped for today in your weekly menu. Check back tomorrow or use the Search tab.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="mb-1 flex items-center justify-between">
+        <p className="text-xs uppercase tracking-wide text-muted-foreground">
+          {todayMeals[0]?.day ?? "Today"}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Goal: {profile.calorie_goal} kcal
+        </p>
+      </div>
+      {todayMeals.map((preset) => {
+        const isLogged = logged.has(preset.id);
+        return (
+          <motion.div
+            key={preset.id}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <Card
+              className={cn(
+                "overflow-hidden rounded-2xl border-white/5 transition-all",
+                isLogged
+                  ? "bg-[var(--rosso)]/5 opacity-60"
+                  : "bg-card/60 backdrop-blur-xl",
+              )}
+            >
+              <CardContent className="flex items-center gap-3 py-3.5">
+                <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-white/5 text-2xl">
+                  {preset.emoji}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="truncate text-sm font-semibold">{preset.name}</p>
+                    {isLogged && <Check className="size-4 text-[var(--rosso)]" />}
+                  </div>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {preset.description}
+                  </p>
+                  <p className="mt-0.5 text-xs">
+                    <span className="font-heading font-bold text-[var(--rosso)]">{preset.kcal}</span>
+                    <span className="text-muted-foreground"> kcal · </span>
+                    <span className="text-muted-foreground">P{preset.protein_g}g C{preset.carb_g}g F{preset.fat_g}g</span>
+                  </p>
+                </div>
+                {!isLogged && (
+                  <motion.button
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => logPreset(preset)}
+                    className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--rosso)] text-white"
+                    aria-label="Log meal"
+                  >
+                    <Plus className="size-5" strokeWidth={2.5} />
+                  </motion.button>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ============ Search Foods ============ */
+function SearchFoodsLog() {
   const foods = useAllFoods();
   const addMeal = useStore((s) => s.addMeal);
   const [query, setQuery] = useState("");
@@ -121,7 +286,6 @@ export function FoodLog() {
 
   return (
     <div className="space-y-4">
-      {/* meal type */}
       <div className="grid grid-cols-4 gap-2">
         {MEAL_TYPES.map((mt) => (
           <button
@@ -131,7 +295,7 @@ export function FoodLog() {
             className={cn(
               "rounded-xl border px-1 py-2 text-xs font-medium transition-colors",
               mealType === mt
-                ? "border-[var(--lime)] bg-[var(--lime)]/10 text-[var(--lime)]"
+                ? "border-[var(--rosso)] bg-[var(--rosso)]/10 text-[var(--rosso)]"
                 : "border-white/10 text-muted-foreground",
             )}
           >
@@ -140,7 +304,6 @@ export function FoodLog() {
         ))}
       </div>
 
-      {/* search */}
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -151,7 +314,6 @@ export function FoodLog() {
         />
       </div>
 
-      {/* results */}
       <div className="space-y-1.5">
         {results.map((f) => (
           <button
@@ -168,17 +330,16 @@ export function FoodLog() {
                 {f.fat_g}
               </p>
             </div>
-            <Plus className="size-4 text-[var(--lime)]" />
+            <Plus className="size-4 text-[var(--rosso)]" />
           </button>
         ))}
         {results.length === 0 && (
           <p className="py-6 text-center text-sm text-muted-foreground">
-            No foods found. Try another search or add a custom food.
+            No foods found. Try another search or use the AI food tab.
           </p>
         )}
       </div>
 
-      {/* cart */}
       {cart.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
@@ -221,7 +382,7 @@ export function FoodLog() {
               ))}
               <Button
                 onClick={save}
-                className="w-full bg-[var(--lime)] text-[var(--ink)] font-semibold hover:bg-[var(--lime)]/90"
+                className="w-full bg-[var(--rosso)] text-white font-semibold hover:bg-[var(--rosso)]/90"
               >
                 Log {MEAL_LABELS[mealType].toLowerCase()}
               </Button>

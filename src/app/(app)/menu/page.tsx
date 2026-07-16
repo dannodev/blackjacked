@@ -51,7 +51,7 @@ export default function MenuPage() {
         </div>
         <div className="text-right">
           <p className="text-xs text-muted-foreground">AI tokens today</p>
-          <p className="font-heading text-sm font-bold text-[var(--lime)]">
+          <p className="font-heading text-sm font-bold text-[var(--rosso)]">
             {aiTokens}
           </p>
         </div>
@@ -71,7 +71,7 @@ export default function MenuPage() {
           <Button
             onClick={generate}
             disabled={loading}
-            className="w-full bg-[var(--lime)] text-[var(--ink)] font-semibold hover:bg-[var(--lime)]/90"
+            className="w-full bg-[var(--rosso)] text-white font-semibold hover:bg-[var(--rosso)]/90"
           >
             {loading ? (
               <>
@@ -106,7 +106,7 @@ export default function MenuPage() {
                   <CardHeader className="pb-3">
                     <CardTitle className="font-heading text-base flex items-center justify-between">
                       <span>{day.day}</span>
-                      <span className="text-sm font-bold text-[var(--lime)]">
+                      <span className="text-sm font-bold text-[var(--rosso)]">
                         ~{day.est_kcal} kcal
                       </span>
                     </CardTitle>

@@ -4,13 +4,20 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* ============ BlackJacked brand tokens ============ */
+/* ============ Rosso / Ferrari-inspired brand tokens ============ */
 :root {
-  --lime: #c7f94b;
-  --amber: #f5a524;
-  --over: #f24e5a;
-  --ink: #0a0b0f;
-  --paper: #f4f2ec;
+  --rosso: #D40000;
+  --rosso-light: #FF1a1a;
+  --rosso-dark: #990000;
+  --rosso-glow: rgba(212, 0, 0, 0.15);
+  --amber: #F5A524;
+  --over: #FF4d4d;
+  --ink: #080808;
+  --paper: #F5F5F5;
+  --smoke: #121214;
+  --charcoal: #1A1A1D;
+  --graphite: #2A2A2E;
+  --carbon: #0F0F11;
 }
 
 @theme inline {
@@ -58,74 +65,74 @@
 
 /* Light palette retained for completeness; app is dark by default. */
 :root {
-  --background: #f4f2ec;
-  --foreground: #0a0b0f;
-  --card: #ffffff;
-  --card-foreground: #0a0b0f;
-  --popover: #ffffff;
-  --popover-foreground: #0a0b0f;
-  --primary: #c7f94b;
-  --primary-foreground: #0a0b0f;
-  --secondary: #e7e5df;
-  --secondary-foreground: #0a0b0f;
-  --muted: #e7e5df;
-  --muted-foreground: #6b7280;
-  --accent: #e7e5df;
-  --accent-foreground: #0a0b0f;
-  --destructive: #f24e5a;
-  --border: #d8d6cf;
-  --input: #d8d6cf;
-  --ring: #c7f94b;
-  --chart-1: #c7f94b;
-  --chart-2: #f5a524;
-  --chart-3: #f24e5a;
-  --chart-4: #4cc2ff;
+  --background: #F5F5F5;
+  --foreground: #080808;
+  --card: #FFFFFF;
+  --card-foreground: #080808;
+  --popover: #FFFFFF;
+  --popover-foreground: #080808;
+  --primary: #D40000;
+  --primary-foreground: #FFFFFF;
+  --secondary: #E7E5DF;
+  --secondary-foreground: #080808;
+  --muted: #E7E5DF;
+  --muted-foreground: #6B7280;
+  --accent: #E7E5DF;
+  --accent-foreground: #080808;
+  --destructive: #FF4d4d;
+  --border: #D8D6CF;
+  --input: #D8D6CF;
+  --ring: #D40000;
+  --chart-1: #D40000;
+  --chart-2: #F5A524;
+  --chart-3: #4cc2ff;
+  --chart-4: #22c55e;
   --chart-5: #8a8f9a;
   --radius: 0.9rem;
-  --sidebar: #0f1116;
-  --sidebar-foreground: #f4f2ec;
-  --sidebar-primary: #c7f94b;
-  --sidebar-primary-foreground: #0a0b0f;
-  --sidebar-accent: #1b1d24;
-  --sidebar-accent-foreground: #f4f2ec;
+  --sidebar: #0F0F11;
+  --sidebar-foreground: #F5F5F5;
+  --sidebar-primary: #D40000;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #1A1A1D;
+  --sidebar-accent-foreground: #F5F5F5;
   --sidebar-border: rgba(255, 255, 255, 0.08);
-  --sidebar-ring: #c7f94b;
+  --sidebar-ring: #D40000;
 }
 
-/* Dark theme = BlackJacked identity. Always-on (html.dark). */
+/* Dark theme = Rosso identity. Always-on (html.dark). */
 .dark {
-  --background: #0a0b0f;
-  --foreground: #f4f2ec;
-  --card: #131419;
-  --card-foreground: #f4f2ec;
-  --popover: #131419;
-  --popover-foreground: #f4f2ec;
-  --primary: #c7f94b;
-  --primary-foreground: #0a0b0f;
-  --secondary: #1b1d24;
-  --secondary-foreground: #f4f2ec;
-  --muted: #1b1d24;
-  --muted-foreground: #8a8f9a;
-  --accent: #1b1d24;
-  --accent-foreground: #f4f2ec;
-  --destructive: #f24e5a;
+  --background: #080808;
+  --foreground: #F5F5F5;
+  --card: #121214;
+  --card-foreground: #F5F5F5;
+  --popover: #121214;
+  --popover-foreground: #F5F5F5;
+  --primary: #D40000;
+  --primary-foreground: #FFFFFF;
+  --secondary: #1A1A1D;
+  --secondary-foreground: #F5F5F5;
+  --muted: #1A1A1D;
+  --muted-foreground: #9a9a9f;
+  --accent: #1A1A1D;
+  --accent-foreground: #F5F5F5;
+  --destructive: #FF4d4d;
   --border: rgba(255, 255, 255, 0.08);
-  --input: rgba(255, 255, 255, 0.14);
-  --ring: #c7f94b;
-  --chart-1: #c7f94b;
-  --chart-2: #f5a524;
-  --chart-3: #f24e5a;
-  --chart-4: #4cc2ff;
+  --input: rgba(255, 255, 255, 0.12);
+  --ring: #D40000;
+  --chart-1: #D40000;
+  --chart-2: #F5A524;
+  --chart-3: #4cc2ff;
+  --chart-4: #22c55e;
   --chart-5: #8a8f9a;
   --radius: 0.9rem;
-  --sidebar: #0d0e13;
-  --sidebar-foreground: #f4f2ec;
-  --sidebar-primary: #c7f94b;
-  --sidebar-primary-foreground: #0a0b0f;
-  --sidebar-accent: #1b1d24;
-  --sidebar-accent-foreground: #f4f2ec;
+  --sidebar: #0A0A0C;
+  --sidebar-foreground: #F5F5F5;
+  --sidebar-primary: #D40000;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #1A1A1D;
+  --sidebar-accent-foreground: #F5F5F5;
   --sidebar-border: rgba(255, 255, 255, 0.08);
-  --sidebar-ring: #c7f94b;
+  --sidebar-ring: #D40000;
 }
 
 @layer base {
@@ -135,13 +142,96 @@
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "ss01", "cv01";
+    /* Carbon-fiber texture */
+    background-image:
+      repeating-linear-gradient(
+        45deg,
+        rgba(255,255,255,0.012) 0px,
+        rgba(255,255,255,0.012) 1px,
+        transparent 1px,
+        transparent 3px
+      ),
+      repeating-linear-gradient(
+        -45deg,
+        rgba(255,255,255,0.012) 0px,
+        rgba(255,255,255,0.012) 1px,
+        transparent 1px,
+        transparent 3px
+      );
+    background-size: 4px 4px, 4px 4px;
   }
   html {
     @apply font-sans;
     color-scheme: dark;
   }
-  /* Stat / heading font utility */
   .font-heading {
     font-family: var(--font-heading), ui-sans-serif, system-ui, sans-serif;
   }
+}
+
+/* Racing stripe accent — subtle red line at top of app */
+.racing-stripe {
+  position: relative;
+}
+.racing-stripe::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--rosso) 15%,
+    var(--rosso) 30%,
+    transparent 30%,
+    transparent 35%,
+    var(--rosso) 35%,
+    var(--rosso) 50%,
+    transparent 50%,
+    transparent 85%,
+    var(--rosso) 85%,
+    var(--rosso) 100%
+  );
+  opacity: 0.6;
+}
+
+/* Carbon-fiber card surface */
+.carbon-card {
+  background-color: var(--card);
+  background-image:
+    repeating-linear-gradient(
+      45deg,
+      rgba(255,255,255,0.008) 0px,
+      rgba(255,255,255,0.008) 1px,
+      transparent 1px,
+      transparent 4px
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      rgba(255,255,255,0.008) 0px,
+      rgba(255,255,255,0.008) 1px,
+      transparent 1px,
+      transparent 4px
+    );
+  background-size: 5px 5px, 5px 5px;
+}
+
+/* Glassmorphism card */
+.glass-card {
+  background: rgba(18, 18, 20, 0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+/* Red glow shadow */
+.rosso-glow {
+  box-shadow: 0 0 24px rgba(212, 0, 0, 0.25), 0 0 1px rgba(212, 0, 0, 0.4);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }

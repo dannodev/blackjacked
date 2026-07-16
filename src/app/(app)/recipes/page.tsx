@@ -33,7 +33,7 @@ export default function RecipesPage() {
         </div>
         <Button
           onClick={() => setShowForm((v) => !v)}
-          className="bg-[var(--lime)] text-[var(--ink)] font-semibold hover:bg-[var(--lime)]/90"
+          className="bg-[var(--rosso)] text-white font-semibold hover:bg-[var(--rosso)]/90"
         >
           <Plus className="mr-1 size-4" />
           New
@@ -56,7 +56,7 @@ export default function RecipesPage() {
       {recipes.length === 0 && !showForm ? (
         <Card className="rounded-2xl border-dashed border-white/10 bg-card/40">
           <CardContent className="flex flex-col items-center gap-3 py-8 text-center">
-            <div className="flex size-12 items-center justify-center rounded-2xl bg-[var(--lime)]/10 text-[var(--lime)]">
+            <div className="flex size-12 items-center justify-center rounded-2xl bg-[var(--rosso)]/10 text-[var(--rosso)]">
               <ChefHat className="size-6" />
             </div>
             <p className="max-w-xs text-sm text-muted-foreground">
@@ -235,7 +235,7 @@ function RecipeForm({
               value={instructions}
               onChange={(e) => setInstructions(e.target.value)}
               placeholder="Marinate 15 min, grill…"
-              className="min-h-16 w-full resize-none rounded-xl border border-white/10 bg-background/60 px-3 py-2 text-sm outline-none focus:border-[var(--lime)]"
+              className="min-h-16 w-full resize-none rounded-xl border border-white/10 bg-background/60 px-3 py-2 text-sm outline-none focus:border-[var(--rosso)]"
             />
           </div>
           <div className="flex gap-2">
@@ -243,7 +243,7 @@ function RecipeForm({
               Cancel
             </Button>
             <Button
-              className="flex-1 bg-[var(--lime)] text-[var(--ink)] font-semibold hover:bg-[var(--lime)]/90"
+              className="flex-1 bg-[var(--rosso)] text-white font-semibold hover:bg-[var(--rosso)]/90"
               onClick={save}
             >
               Save recipe

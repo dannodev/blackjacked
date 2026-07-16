@@ -84,7 +84,7 @@ export function AiFoodLog() {
             className={cn(
               "rounded-xl border px-1 py-2 text-xs font-medium capitalize transition-colors",
               mealType === mt
-                ? "border-[var(--lime)] bg-[var(--lime)]/10 text-[var(--lime)]"
+                ? "border-[var(--rosso)] bg-[var(--rosso)]/10 text-[var(--rosso)]"
                 : "border-white/10 text-muted-foreground",
             )}
           >
@@ -95,7 +95,7 @@ export function AiFoodLog() {
 
       <Card className="rounded-2xl border-white/5 bg-card/60 backdrop-blur-xl">
         <CardContent className="space-y-3 py-4">
-          <div className="flex items-center gap-2 text-sm text-[var(--lime)]">
+          <div className="flex items-center gap-2 text-sm text-[var(--rosso)]">
             <Sparkles className="size-4" />
             <span className="font-medium">Describe your meal in plain words</span>
           </div>
@@ -103,12 +103,12 @@ export function AiFoodLog() {
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="e.g. 2 eggs with spinach and 2 tortillas, plus a banana"
-            className="min-h-20 w-full resize-none rounded-xl border border-white/10 bg-background/60 px-3 py-2.5 text-sm outline-none focus:border-[var(--lime)]"
+            className="min-h-20 w-full resize-none rounded-xl border border-white/10 bg-background/60 px-3 py-2.5 text-sm outline-none focus:border-[var(--rosso)]"
           />
           <Button
             onClick={analyze}
             disabled={loading}
-            className="w-full bg-[var(--lime)] text-[var(--ink)] font-semibold hover:bg-[var(--lime)]/90"
+            className="w-full bg-[var(--rosso)] text-white font-semibold hover:bg-[var(--rosso)]/90"
           >
             {loading ? (
               <>
@@ -136,7 +136,7 @@ export function AiFoodLog() {
               <CardHeader>
                 <CardTitle className="font-heading text-base flex items-center justify-between">
                   <span>Confirm before saving</span>
-                  <span className="font-heading text-xl font-bold text-[var(--lime)]">
+                  <span className="font-heading text-xl font-bold text-[var(--rosso)]">
                     {result.total_kcal} kcal
                   </span>
                 </CardTitle>
@@ -164,7 +164,7 @@ export function AiFoodLog() {
                     Discard
                   </Button>
                   <Button
-                    className="flex-1 bg-[var(--lime)] text-[var(--ink)] font-semibold hover:bg-[var(--lime)]/90"
+                    className="flex-1 bg-[var(--rosso)] text-white font-semibold hover:bg-[var(--rosso)]/90"
                     onClick={confirm}
                   >
                     <Check className="mr-1 size-4" />

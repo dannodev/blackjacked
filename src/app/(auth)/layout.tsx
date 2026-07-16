@@ -28,7 +28,7 @@ export default function AuthLayout({
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            "radial-gradient(120% 80% at 50% -10%, rgba(199,249,75,0.10), transparent 60%)",
+            "radial-gradient(120% 80% at 50% -10%, rgba(212,0,0,0.08), transparent 60%)",
         }}
       />
       <div className="relative z-10 mx-auto flex min-h-[100dvh] max-w-md flex-col items-center justify-center px-5 py-12">

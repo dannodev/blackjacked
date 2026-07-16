@@ -91,14 +91,14 @@ export default function StatsPage() {
         <CardHeader>
           <CardTitle className="font-heading text-base flex items-center justify-between">
             <span className="flex items-center gap-2">
-              <Scale className="size-4 text-[var(--lime)]" />
+              <Scale className="size-4 text-[var(--rosso)]" />
               Weight trend
             </span>
             {weightChange !== 0 && (
               <span
                 className={
                   "text-sm font-bold " +
-                  (weightChange < 0 ? "text-[var(--lime)]" : "text-[var(--amber)]")
+                  (weightChange < 0 ? "text-[var(--rosso)]" : "text-[var(--amber)]")
                 }
               >
                 {weightChange > 0 ? "+" : ""}
@@ -115,8 +115,8 @@ export default function StatsPage() {
               <AreaChart data={weightData}>
                 <defs>
                   <linearGradient id="weightGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--lime)" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="var(--lime)" stopOpacity={0} />
+                    <stop offset="5%" stopColor="var(--rosso)" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="var(--rosso)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
@@ -133,7 +133,7 @@ export default function StatsPage() {
                 <Area
                   type="monotone"
                   dataKey="weight"
-                  stroke="var(--lime)"
+                  stroke="var(--rosso)"
                   strokeWidth={2}
                   fill="url(#weightGrad)"
                 />
@@ -147,7 +147,7 @@ export default function StatsPage() {
       <Card className="rounded-2xl border-white/5 bg-card/60 backdrop-blur-xl">
         <CardHeader>
           <CardTitle className="font-heading text-base flex items-center gap-2">
-            <TrendingDown className="size-4 text-[var(--lime)]" />
+            <TrendingDown className="size-4 text-[var(--rosso)]" />
             7-day deficit
           </CardTitle>
         </CardHeader>
@@ -167,7 +167,7 @@ export default function StatsPage() {
               />
               <Bar
                 dataKey="goal_deficit"
-                fill="var(--lime)"
+                fill="var(--rosso)"
                 radius={[4, 4, 0, 0]}
                 opacity={0.6}
                 name="Goal deficit"
@@ -192,7 +192,7 @@ export default function StatsPage() {
             </ComposedChart>
           </ResponsiveContainer>
           <div className="mt-3 flex gap-4 text-xs">
-            <Legend color="var(--lime)" label="Goal deficit (bar)" />
+            <Legend color="var(--rosso)" label="Goal deficit (bar)" />
             <Legend color="var(--amber)" label="Real deficit (line)" />
             <Legend color="var(--over)" label="kcal in (dotted)" />
           </div>

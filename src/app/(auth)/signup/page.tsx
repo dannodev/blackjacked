@@ -97,7 +97,7 @@ export default function SignupPage() {
           <motion.div whileTap={{ scale: 0.97 }} className="w-full">
             <Button
               type="submit"
-              className="w-full bg-[var(--lime)] text-[var(--ink)] font-semibold hover:bg-[var(--lime)]/90"
+              className="w-full bg-[var(--rosso)] text-white font-semibold hover:bg-[var(--rosso)]/90"
               disabled={isSubmitting}
             >
               {isSubmitting ? "Lighting the spark…" : "Get started"}
@@ -107,7 +107,7 @@ export default function SignupPage() {
             Already in?{" "}
             <Link
               href="/login"
-              className="font-medium text-[var(--lime)] underline-offset-4 hover:underline"
+              className="font-medium text-[var(--rosso)] underline-offset-4 hover:underline"
             >
               Log in
             </Link>

@@ -195,9 +195,9 @@ describe("computeDay", () => {
 });
 
 describe("ringState", () => {
-  it("returns lime when on track (>25% of goal remaining)", () => {
+  it("returns rosso when on track (>25% of goal remaining)", () => {
     const s = ringState(500, 1900);
-    expect(s.color).toBe("var(--lime)");
+    expect(s.color).toBe("var(--rosso)");
     expect(s.label).toBe("On track");
   });
   it("returns amber when near goal (<25% remaining but >0)", () => {

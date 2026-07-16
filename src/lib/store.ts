@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { get as idbGet, set as idbSet, del as idbDel } from "idb-keyval";
@@ -11,6 +12,8 @@ import type {
   Recipe,
   Streaks,
   FoodItem,
+  Squad,
+  SquadMember,
 } from "./types";
 import { todayKey } from "./types";
 import { FOODS } from "./foods-seed";
@@ -45,6 +48,7 @@ interface State {
   sleepToday: number;
   notesToday: string;
   aiTokenCount: number;
+  squad: Squad | null;
   setProfile: (p: Profile) => void;
   updateProfile: (patch: Partial<Profile>) => void;
   addMeal: (m: Meal) => void;
@@ -60,6 +64,11 @@ interface State {
   setNotes: (s: string) => void;
   bumpAiTokens: (n: number) => void;
   touchStreak: () => void;
+  createSquad: (name: string) => void;
+  addSquadMember: (m: Omit<SquadMember, "id">) => void;
+  updateSquadMember: (id: string, patch: Partial<SquadMember>) => void;
+  removeSquadMember: (id: string) => void;
+  leaveSquad: () => void;
   resetAll: () => void;
 }
 
@@ -82,6 +91,7 @@ export const useStore = create<State>()(
       sleepToday: 0,
       notesToday: "",
       aiTokenCount: 0,
+      squad: null,
 
       setProfile: (p) => set({ profile: p }),
       updateProfile: (patch) =>
@@ -123,6 +133,50 @@ export const useStore = create<State>()(
       setNotes: (str) => set({ notesToday: str }),
       bumpAiTokens: (n) => set((s) => ({ aiTokenCount: s.aiTokenCount + n })),
 
+      createSquad: (name) =>
+        set({
+          squad: {
+            id: crypto.randomUUID(),
+            name,
+            members: [],
+            createdAt: new Date().toISOString(),
+          },
+        }),
+
+      addSquadMember: (m) =>
+        set((s) => {
+          if (!s.squad) return {};
+          if (s.squad.members.length >= 6) return {};
+          const member: SquadMember = { ...m, id: crypto.randomUUID() };
+          return { squad: { ...s.squad, members: [...s.squad.members, member] } };
+        }),
+
+      updateSquadMember: (id, patch) =>
+        set((s) => {
+          if (!s.squad) return {};
+          return {
+            squad: {
+              ...s.squad,
+              members: s.squad.members.map((m) =>
+                m.id === id ? { ...m, ...patch } : m,
+              ),
+            },
+          };
+        }),
+
+      removeSquadMember: (id) =>
+        set((s) => {
+          if (!s.squad) return {};
+          return {
+            squad: {
+              ...s.squad,
+              members: s.squad.members.filter((m) => m.id !== id),
+            },
+          };
+        }),
+
+      leaveSquad: () => set({ squad: null }),
+
       touchStreak: () => {
         const today = todayKey();
         set((s) => {
@@ -160,6 +214,7 @@ export const useStore = create<State>()(
           sleepToday: 0,
           notesToday: "",
           aiTokenCount: 0,
+          squad: null,
         }),
     }),
     {
@@ -173,5 +228,6 @@ export const useStore = create<State>()(
 );
 
 export function useAllFoods(): FoodItem[] {
-  return useStore((s) => [...s.customFoods, ...SEED_FOODS]);
+  const customFoods = useStore((s) => s.customFoods);
+  return useMemo(() => [...customFoods, ...SEED_FOODS], [customFoods]);
 }

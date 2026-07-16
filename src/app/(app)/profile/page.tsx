@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ACTIVITY_OPTIONS } from "@/lib/types";
-import { Bolt, Bell, BellOff } from "lucide-react";
+import { Bolt, Bell, BellOff, Users } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -68,7 +68,7 @@ export default function ProfilePage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <div className="flex size-14 items-center justify-center rounded-2xl bg-[var(--lime)]/10 text-[var(--lime)] font-heading text-xl font-bold">
+        <div className="flex size-14 items-center justify-center rounded-2xl bg-[var(--rosso)]/10 text-[var(--rosso)] font-heading text-xl font-bold">
           {user?.name.slice(0, 2).toUpperCase()}
         </div>
         <div>
@@ -97,7 +97,7 @@ export default function ProfilePage() {
       <Card className="rounded-2xl border-white/5 bg-card/60 backdrop-blur-xl">
         <CardHeader>
           <CardTitle className="font-heading text-base flex items-center gap-2">
-            <Bolt className="size-4 text-[var(--lime)]" />
+            <Bolt className="size-4 text-[var(--rosso)]" />
             Daily targets
           </CardTitle>
         </CardHeader>
@@ -116,7 +116,7 @@ export default function ProfilePage() {
         >
           <div className="flex items-center gap-2">
             {remindersOn ? (
-              <Bell className="size-4 text-[var(--lime)]" />
+              <Bell className="size-4 text-[var(--rosso)]" />
             ) : (
               <BellOff className="size-4 text-muted-foreground" />
             )}
@@ -126,7 +126,7 @@ export default function ProfilePage() {
             className={
               "rounded-full px-2 py-0.5 text-xs font-medium " +
               (remindersOn
-                ? "bg-[var(--lime)]/15 text-[var(--lime)]"
+                ? "bg-[var(--rosso)]/15 text-[var(--rosso)]"
                 : "bg-white/5 text-muted-foreground")
             }
           >
@@ -141,6 +141,12 @@ export default function ProfilePage() {
         <Link href="/checkin">
           <Button variant="outline" className="w-full">
             Weekly check-in
+          </Button>
+        </Link>
+        <Link href="/squad">
+          <Button variant="outline" className="w-full">
+            <Users className="mr-2 size-4" />
+            Your squad
           </Button>
         </Link>
         <Button
@@ -183,7 +189,7 @@ function Stat({
         <p
           className={
             "font-heading text-2xl font-bold " +
-            (accent ? "text-[var(--lime)]" : "")
+            (accent ? "text-[var(--rosso)]" : "")
           }
         >
           {value}

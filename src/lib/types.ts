@@ -221,7 +221,7 @@ export function ringState(remaining: number, goal: number) {
   const ratio = goal <= 0 ? 1 : remaining / goal;
   if (remaining <= 0) return { color: "var(--over)", label: "Over" } as const;
   if (ratio < 0.25) return { color: "var(--amber)", label: "Near goal" } as const;
-  return { color: "var(--lime)", label: "On track" } as const;
+  return { color: "var(--rosso)", label: "On track" } as const;
 }
 
 export const todayKey = (at = new Date()): string =>
@@ -239,3 +239,20 @@ export const MEAL_LABELS: Record<MealType, string> = {
   dinner: "Dinner",
   snack: "Snack",
 };
+
+export interface SquadMember {
+  id: string;
+  name: string;
+  color: string;
+  calorie_goal: number;
+  kcal_in: number;
+  kcal_out: number;
+  streak: number;
+}
+
+export interface Squad {
+  id: string;
+  name: string;
+  members: SquadMember[];
+  createdAt: string;
+}

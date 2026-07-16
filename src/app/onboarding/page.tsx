@@ -4,7 +4,7 @@ import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 import { useStore } from "@/lib/store";
@@ -61,6 +61,10 @@ export default function OnboardingPage() {
   // Suggest goals when activity changes
   const watchActivity = goalForm.watch("activity_factor");
   const watchBasics = basicsForm.watch();
+  const watchCalorieGoal = goalForm.watch("calorie_goal");
+  const watchProtein = goalForm.watch("protein_goal");
+  const watchFat = goalForm.watch("fat_goal");
+  const watchCarb = goalForm.watch("carb_goal");
   const suggestion = useMemo(() => {
     if (!watchBasics?.height_cm || !watchBasics?.current_weight_kg || !watchBasics?.birthdate)
       return null;
@@ -78,6 +82,24 @@ export default function OnboardingPage() {
     const carb = Math.round((goalCal - protein * 4 - fat * 9) / 4);
     return { goalCal: Math.max(1200, goalCal), protein, fat, carb, tdee };
   }, [watchBasics, watchActivity]);
+
+  // Live-recalculate macros when the user edits the calorie goal on the goal step
+  useEffect(() => {
+    if (step !== 2) return;
+    const cals = Number(watchCalorieGoal);
+    if (!cals || cals < 800) return;
+    // protein: at least 1.6g/kg body weight, or 30% of cals — whichever is higher
+    const minProtein = watchBasics?.current_weight_kg
+      ? Math.round(watchBasics.current_weight_kg * 1.6)
+      : 0;
+    const pctProtein = Math.round((cals * 0.3) / 4);
+    const protein = Math.max(minProtein, pctProtein);
+    const fat = Math.round((cals * 0.25) / 9);
+    const carb = Math.round((cals - protein * 4 - fat * 9) / 4);
+    goalForm.setValue("protein_goal", protein, { shouldDirty: true });
+    goalForm.setValue("fat_goal", fat, { shouldDirty: true });
+    goalForm.setValue("carb_goal", carb, { shouldDirty: true });
+  }, [watchCalorieGoal, step, watchBasics?.current_weight_kg]);
 
   const onBasicsSubmit = () => {
     basicsForm.clearErrors();
@@ -122,7 +144,7 @@ export default function OnboardingPage() {
             key={i}
             className={cn(
               "h-1.5 flex-1 rounded-full transition-colors",
-              i <= step ? "bg-[var(--lime)]" : "bg-white/10",
+              i <= step ? "bg-[var(--rosso)]" : "bg-white/10",
             )}
           />
         ))}
@@ -156,7 +178,7 @@ export default function OnboardingPage() {
                         className={cn(
                           "rounded-xl border px-3 py-2.5 text-sm capitalize transition-colors",
                           basicsForm.watch("sex") === s
-                            ? "border-[var(--lime)] bg-[var(--lime)]/10 text-[var(--lime)]"
+                            ? "border-[var(--rosso)] bg-[var(--rosso)]/10 text-[var(--rosso)]"
                             : "border-white/10 text-muted-foreground",
                         )}
                       >
@@ -208,7 +230,7 @@ export default function OnboardingPage() {
             </Card>
             <Button
               type="submit"
-              className="w-full bg-[var(--lime)] text-[var(--ink)] font-semibold hover:bg-[var(--lime)]/90"
+              className="w-full bg-[var(--rosso)] text-white font-semibold hover:bg-[var(--rosso)]/90"
             >
               Continue
             </Button>
@@ -240,13 +262,13 @@ export default function OnboardingPage() {
                   className={cn(
                     "w-full rounded-2xl border px-4 py-3 text-left transition-colors",
                     goalForm.watch("activity_factor") === opt.value
-                      ? "border-[var(--lime)] bg-[var(--lime)]/10"
+                      ? "border-[var(--rosso)] bg-[var(--rosso)]/10"
                       : "border-white/10 bg-card/40",
                   )}
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-medium">{opt.label}</span>
-                    <span className="font-heading text-sm text-[var(--lime)]">
+                    <span className="font-heading text-sm text-[var(--rosso)]">
                       ×{opt.value}
                     </span>
                   </div>
@@ -263,7 +285,7 @@ export default function OnboardingPage() {
                 Back
               </Button>
               <Button
-                className="flex-1 bg-[var(--lime)] text-[var(--ink)] font-semibold hover:bg-[var(--lime)]/90"
+                className="flex-1 bg-[var(--rosso)] text-white font-semibold hover:bg-[var(--rosso)]/90"
                 onClick={onActivityNext}
               >
                 Continue
@@ -290,7 +312,7 @@ export default function OnboardingPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {suggestion && (
-                  <div className="rounded-xl bg-[var(--lime)]/10 px-3 py-2 text-xs text-[var(--lime)]">
+                  <div className="rounded-xl bg-[var(--rosso)]/10 px-3 py-2 text-xs text-[var(--rosso)]">
                     Suggested from your TDEE ≈{" "}
                     <span className="font-heading">
                       {Math.round(suggestion.tdee)}
@@ -311,22 +333,32 @@ export default function OnboardingPage() {
                       {goalForm.formState.errors.calorie_goal.message}
                     </p>
                   )}
+                  <p className="text-xs text-muted-foreground">
+                    Macros below auto-update when you change calories.
+                  </p>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
-                  {(["protein_goal", "fat_goal", "carb_goal"] as const).map(
-                    (k) => (
-                      <div key={k} className="space-y-2">
-                        <Label htmlFor={k} className="text-xs">
-                          {k.replace("_goal", "")} (g)
-                        </Label>
-                        <Input
-                          id={k}
-                          type="number"
-                          {...goalForm.register(k)}
-                        />
-                      </div>
-                    ),
-                  )}
+                  {([
+                    { key: "protein_goal", val: watchProtein },
+                    { key: "fat_goal", val: watchFat },
+                    { key: "carb_goal", val: watchCarb },
+                  ] as const).map(({ key, val }) => (
+                    <div key={key} className="space-y-2">
+                      <Label htmlFor={key} className="text-xs">
+                        {key.replace("_goal", "")} (g)
+                      </Label>
+                      <Input
+                        id={key}
+                        type="number"
+                        value={val ?? 0}
+                        onChange={(e) =>
+                          goalForm.setValue(key, +e.target.value, {
+                            shouldDirty: true,
+                          })
+                        }
+                      />
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
@@ -341,7 +373,7 @@ export default function OnboardingPage() {
               </Button>
               <Button
                 type="submit"
-                className="flex-1 bg-[var(--lime)] text-[var(--ink)] font-semibold hover:bg-[var(--lime)]/90"
+                className="flex-1 bg-[var(--rosso)] text-white font-semibold hover:bg-[var(--rosso)]/90"
               >
                 Finish
               </Button>

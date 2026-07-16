@@ -25,7 +25,7 @@ export function Bolt({
 
 export function Wordmark({
   className,
-  size = "text-2xl",
+  size = "text-xl",
 }: {
   className?: string;
   size?: string;
@@ -33,13 +33,13 @@ export function Wordmark({
   return (
     <span
       className={cn(
-        "font-heading font-bold tracking-tight inline-flex items-center leading-none text-foreground",
+        "font-bold tracking-tight inline-flex items-center leading-none text-foreground",
         size,
         className,
       )}
     >
       Blac
-      <Bolt className="mx-[0.04em] -my-[0.05em] h-[0.85em] w-[0.85em] text-[var(--lime)]" strokeWidth={2.5} />
+      <Bolt className="mx-[0.04em] -my-[0.05em] h-[0.85em] w-[0.85em] text-[var(--rosso)]" strokeWidth={2.5} />
       Jacked
     </span>
   );

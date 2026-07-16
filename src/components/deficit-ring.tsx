@@ -61,7 +61,7 @@ export function DeficitRing({
           cy="100"
           r={R}
           fill="none"
-          stroke="var(--card)"
+          stroke="rgba(255,255,255,0.08)"
           strokeWidth="14"
         />
         <motion.circle

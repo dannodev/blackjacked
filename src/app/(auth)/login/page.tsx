@@ -92,7 +92,7 @@ export default function LoginPage() {
           >
             <Button
               type="submit"
-              className="w-full bg-[var(--lime)] text-[var(--ink)] font-semibold hover:bg-[var(--lime)]/90"
+              className="w-full bg-[var(--rosso)] text-white font-semibold hover:bg-[var(--rosso)]/90"
               disabled={isSubmitting}
             >
               {isSubmitting ? "Burning in…" : "Log in"}
@@ -102,7 +102,7 @@ export default function LoginPage() {
             No account?{" "}
             <Link
               href="/signup"
-              className="font-medium text-[var(--lime)] underline-offset-4 hover:underline"
+              className="font-medium text-[var(--rosso)] underline-offset-4 hover:underline"
             >
               Create one
             </Link>
