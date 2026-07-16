@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useStore } from "@/lib/store";
+import { useCloudExerciseLogs } from "@/lib/use-cloud-exercise-logs";
 import { makeId } from "@/lib/id";
 import { EXERCISES, CATEGORY_LABELS } from "@/lib/exercises-seed";
 import type { Exercise, ExerciseCategory, ExerciseLog } from "@/lib/types";
@@ -33,7 +34,7 @@ const CATEGORIES: (ExerciseCategory | "all")[] = [
 
 export function ExerciseLogForm() {
   const profile = useStore((s) => s.profile)!;
-  const addExerciseLog = useStore((s) => s.addExerciseLog);
+  const { addExerciseLog } = useCloudExerciseLogs();
   const [cat, setCat] = useState<ExerciseCategory | "all">("all");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Exercise | null>(null);
@@ -57,7 +58,7 @@ export function ExerciseLogForm() {
     ? activityKcal(selected.mets, profile.current_weight_kg, duration)
     : 0;
 
-  function log() {
+  async function log() {
     if (!selected) {
       toast.error("Pick an exercise");
       return;
@@ -79,7 +80,7 @@ export function ExerciseLogForm() {
       kcal_burned: kcal,
       loggedAt: new Date().toISOString(),
     };
-    addExerciseLog(log);
+    await addExerciseLog(log);
     toast.success(`${selected.name} logged`, {
       description: `~${Math.round(kcal)} kcal burned`,
     });

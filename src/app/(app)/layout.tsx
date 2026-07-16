@@ -10,6 +10,8 @@ import { useStore } from "@/lib/store";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 import { loadSupabaseProfile } from "@/lib/supabase/profile";
 import { loadSupabaseWeightLogs } from "@/lib/supabase/weight-logs";
+import { loadSupabaseMeals } from "@/lib/supabase/meals";
+import { loadSupabaseExerciseLogs } from "@/lib/supabase/exercise-logs";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -17,6 +19,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const hydrated = useHydrated();
   const profile = useStore((s) => s.profile);
   const setProfile = useStore((s) => s.setProfile);
+  const setMeals = useStore((s) => s.setMeals);
+  const setExerciseLogs = useStore((s) => s.setExerciseLogs);
   const setWeightLogs = useStore((s) => s.setWeightLogs);
   const [profileChecked, setProfileChecked] = useState(false);
 
@@ -68,6 +72,46 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       cancelled = true;
     };
   }, [hydrated, profile, setWeightLogs, user]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function syncMeals() {
+      if (!hydrated || !user || !profile || !isSupabaseConfigured()) return;
+
+      try {
+        const remoteMeals = await loadSupabaseMeals(user.id);
+        if (!cancelled && remoteMeals.length > 0) setMeals(remoteMeals);
+      } catch {
+        // Local meal logging still works if cloud sync is temporarily unavailable.
+      }
+    }
+
+    void syncMeals();
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrated, profile, setMeals, user]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function syncExerciseLogs() {
+      if (!hydrated || !user || !profile || !isSupabaseConfigured()) return;
+
+      try {
+        const remoteLogs = await loadSupabaseExerciseLogs(user.id);
+        if (!cancelled && remoteLogs.length > 0) setExerciseLogs(remoteLogs);
+      } catch {
+        // Local workout logging still works if cloud sync is temporarily unavailable.
+      }
+    }
+
+    void syncExerciseLogs();
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrated, profile, setExerciseLogs, user]);
 
   useEffect(() => {
     if (hydrated && user && profileChecked && !profile) router.replace("/onboarding");

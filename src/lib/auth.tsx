@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { isSupabaseConfigured, getSupabaseBrowser } from "@/lib/supabase/client";
+import { useStore } from "@/lib/store";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
 export type AppUser = {
@@ -35,6 +36,7 @@ type AuthContextValue = AuthState & {
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+const LAST_USER_KEY = "blackjacked.lastUserId";
 
 /** Extract AppUser from Supabase user metadata. */
 export function supabaseToAppUser(u: SupabaseUser): AppUser {
@@ -52,21 +54,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const applySupabaseUser = useCallback((nextUser: SupabaseUser | null) => {
+    if (!nextUser) {
+      setUser(null);
+      return;
+    }
+
+    const previousUserId = localStorage.getItem(LAST_USER_KEY);
+    if (previousUserId && previousUserId !== nextUser.id) {
+      useStore.getState().resetAll();
+    }
+
+    localStorage.setItem(LAST_USER_KEY, nextUser.id);
+    setUser(supabaseToAppUser(nextUser));
+  }, []);
+
   // ── Init ──────────────────────────────────────────────
   useEffect(() => {
     if (useSupabase) {
       // Supabase mode: check current session
       const supabase = getSupabaseBrowser();
       supabase.auth.getUser().then(({ data }) => {
-        if (data.user) setUser(supabaseToAppUser(data.user));
-        else setUser(null);
+        applySupabaseUser(data.user);
         setLoading(false);
       });
       // Listen for auth changes
       const { data: listener } = supabase.auth.onAuthStateChange(
         (_event, session) => {
-          if (session?.user) setUser(supabaseToAppUser(session.user));
-          else setUser(null);
+          applySupabaseUser(session?.user ?? null);
           setLoading(false);
         },
       );
@@ -74,7 +89,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } else {
       setLoading(false);
     }
-  }, [useSupabase]);
+  }, [applySupabaseUser, useSupabase]);
 
   // ── Sign in ───────────────────────────────────────────
   const signIn = useCallback(
@@ -139,6 +154,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } else {
       setUser(null);
     }
+    localStorage.removeItem(LAST_USER_KEY);
+    useStore.getState().resetAll();
   }, [useSupabase]);
 
   const value = useMemo<AuthContextValue>(

@@ -223,9 +223,7 @@ async function compressPhoto(file: File): Promise<{
   blob: Blob;
   previewUrl: string;
 }> {
-  const image = await createImageBitmap(file, {
-    imageOrientation: "from-image",
-  });
+  const image = await loadImage(file);
   const maxSide = 900;
   const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
   const width = Math.round(image.width * scale);
@@ -237,7 +235,6 @@ async function compressPhoto(file: File): Promise<{
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Canvas unavailable");
   context.drawImage(image, 0, 0, width, height);
-  image.close();
 
   const blob = await new Promise<Blob | null>((resolve) =>
     canvas.toBlob(resolve, "image/jpeg", 0.72),
@@ -249,6 +246,19 @@ async function compressPhoto(file: File): Promise<{
     blob,
     previewUrl: canvas.toDataURL("image/jpeg", 0.72),
   };
+}
+
+async function loadImage(file: File): Promise<HTMLImageElement> {
+  const url = URL.createObjectURL(file);
+  try {
+    const image = new window.Image();
+    image.decoding = "async";
+    image.src = url;
+    await image.decode();
+    return image;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
 
 async function uploadCloudPhoto(blob: Blob): Promise<string> {

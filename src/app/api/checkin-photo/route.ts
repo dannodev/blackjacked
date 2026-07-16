@@ -10,12 +10,13 @@ type CloudinaryResponse = {
   error?: { message?: string };
 };
 
-function missingCloudinaryConfig() {
-  return !(
-    process.env.CLOUDINARY_CLOUD_NAME &&
-    process.env.CLOUDINARY_API_KEY &&
-    process.env.CLOUDINARY_API_SECRET
-  );
+function cloudinaryConfig() {
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+  const apiKey = process.env.CLOUDINARY_API_KEY;
+  const apiSecret = process.env.CLOUDINARY_API_SECRET;
+
+  if (!cloudName || !apiKey || !apiSecret) return null;
+  return { cloudName, apiKey, apiSecret };
 }
 
 export async function POST(request: Request) {
@@ -26,14 +27,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Sign in to upload photos." }, { status: 401 });
   }
 
-  if (missingCloudinaryConfig()) {
+  const config = cloudinaryConfig();
+  if (!config) {
     return NextResponse.json(
       { error: "Cloudinary is not configured yet." },
       { status: 503 },
     );
   }
 
-  const formData = await request.formData();
+  let formData: FormData;
+  try {
+    formData = await request.formData();
+  } catch {
+    return NextResponse.json({ error: "Invalid upload request." }, { status: 400 });
+  }
   const file = formData.get("file");
 
   if (!(file instanceof File)) {
@@ -59,11 +66,11 @@ export async function POST(request: Request) {
   uploadForm.append("overwrite", "false");
 
   const credentials = Buffer.from(
-    `${process.env.CLOUDINARY_API_KEY}:${process.env.CLOUDINARY_API_SECRET}`,
+    `${config.apiKey}:${config.apiSecret}`,
   ).toString("base64");
 
   const response = await fetch(
-    `https://api.cloudinary.com/v1_1/${process.env.CLOUDINARY_CLOUD_NAME}/image/upload`,
+    `https://api.cloudinary.com/v1_1/${config.cloudName}/image/upload`,
     {
       method: "POST",
       headers: {

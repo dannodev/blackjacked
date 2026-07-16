@@ -1,23 +1,39 @@
 "use client";
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { useStore } from "./store";
 
-export const AI_PROVIDER = "gemini-2.0-flash";
+export const AI_PROVIDER = "gemini-3.5-flash";
 export const FREE_TIER_DAILY_CAP = 1500;
 
 export function hasGeminiKey(): boolean {
-  return typeof process !== "undefined" && !!process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-}
-
-function getClient() {
-  const key = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-  if (!key) return null;
-  return new GoogleGenerativeAI(key);
+  return true;
 }
 
 function trackTokens(n: number) {
   useStore.getState().bumpAiTokens(n);
+}
+
+async function requestAiJson<T>(
+  action: "food" | "menu" | "exercise" | "insight",
+  prompt: string,
+): Promise<T> {
+  const response = await fetch("/api/ai", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action, prompt }),
+  });
+  const result = (await response.json()) as {
+    data?: unknown;
+    tokens?: number;
+    error?: string;
+  };
+
+  if (!response.ok || result.data === undefined) {
+    throw new Error(result.error ?? "AI request failed");
+  }
+
+  if (result.tokens) trackTokens(Math.ceil(result.tokens));
+  return result.data as T;
 }
 
 /* ============ Types ============ */
@@ -66,27 +82,59 @@ export interface AIInsight {
   insight: string;
 }
 
+function isNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function isNonNegativeNumber(value: unknown): value is number {
+  return isNumber(value) && value >= 0;
+}
+
+function assertFoodResult(value: unknown): AIFoodResult {
+  const data = value as Partial<AIFoodResult>;
+  if (
+    !data ||
+    !Array.isArray(data.ingredients) ||
+    data.ingredients.length === 0 ||
+    !isNonNegativeNumber(data.total_kcal) ||
+    !isNonNegativeNumber(data.total_protein_g) ||
+    !isNonNegativeNumber(data.total_fat_g) ||
+    !isNonNegativeNumber(data.total_carb_g) ||
+    typeof data.summary !== "string"
+  ) {
+    throw new Error("Gemini returned an invalid food macro shape.");
+  }
+
+  for (const ingredient of data.ingredients) {
+    if (
+      !ingredient ||
+      typeof ingredient.name !== "string" ||
+      typeof ingredient.unit !== "string" ||
+      !isNonNegativeNumber(ingredient.quantity) ||
+      !isNonNegativeNumber(ingredient.kcal) ||
+      !isNonNegativeNumber(ingredient.protein_g) ||
+      !isNonNegativeNumber(ingredient.fat_g) ||
+      !isNonNegativeNumber(ingredient.carb_g)
+    ) {
+      throw new Error("Gemini returned an invalid ingredient macro shape.");
+    }
+  }
+
+  return data as AIFoodResult;
+}
+
 /* ============ Food breakdown ============ */
 
 export async function aiFoodBreakdown(text: string): Promise<AIFoodResult> {
-  const client = getClient();
   const prompt = `You are a nutrition expert. Break down this food description into ingredients with macro estimates.
 Return ONLY valid JSON (no markdown, no code fences) matching this TypeScript type:
 { ingredients: { name: string; quantity: number; unit: string; kcal: number; protein_g: number; fat_g: number; carb_g: number }[]; total_kcal: number; total_protein_g: number; total_fat_g: number; total_carb_g: number; summary: string }
 
 Food description: "${text}"`;
 
-  if (!client) return mockFoodBreakdown(text);
-
   try {
-    const model = client.getGenerativeModel({
-      model: "gemini-2.0-flash",
-      generationConfig: { responseMimeType: "application/json" },
-    });
-    const result = await model.generateContent(prompt);
-    const json = JSON.parse(result.response.text());
-    trackTokens(Math.ceil(result.response.usageMetadata?.totalTokenCount ?? 200));
-    return json as AIFoodResult;
+    const result = await requestAiJson<unknown>("food", prompt);
+    return assertFoodResult(result);
   } catch (e) {
     console.warn("Gemini food call failed, using mock", e);
     void e;
@@ -105,7 +153,6 @@ export async function aiMenuPlan(
     dinner_ne_lunch: boolean;
   },
 ): Promise<AIMenuPlan> {
-  const client = getClient();
   const conds = [
     `Target ${constraints.calorie_goal} kcal/day`,
     `Protein goal ${constraints.protein_goal}g/day`,
@@ -120,17 +167,8 @@ Return ONLY valid JSON (no markdown) matching:
 
 Reference menu:\n${menuText}`;
 
-  if (!client) return mockMenuPlan(menuText, constraints);
-
   try {
-    const model = client.getGenerativeModel({
-      model: "gemini-2.0-flash",
-      generationConfig: { responseMimeType: "application/json" },
-    });
-    const result = await model.generateContent(prompt);
-    const json = JSON.parse(result.response.text());
-    trackTokens(Math.ceil(result.response.usageMetadata?.totalTokenCount ?? 500));
-    return json as AIMenuPlan;
+    return await requestAiJson<AIMenuPlan>("menu", prompt);
   } catch (e) {
     console.warn("Gemini menu call failed, using mock", e);
     return mockMenuPlan(menuText, constraints);
@@ -142,7 +180,6 @@ Reference menu:\n${menuText}`;
 export async function aiExerciseMatch(
   text: string,
 ): Promise<AIExerciseMatch[]> {
-  const client = getClient();
   const prompt = `Match this workout description to exercises from a library. Return ONLY JSON (no markdown) array matching:
 { exercise_id: string; name: string; mets: number; category: string; confidence: number }[]
 
@@ -150,17 +187,8 @@ Library: ${JSON.stringify(EXERCISES_FOR_MATCH)}
 
 Workout: "${text}"`;
 
-  if (!client) return mockExerciseMatch(text);
-
   try {
-    const model = client.getGenerativeModel({
-      model: "gemini-2.0-flash",
-      generationConfig: { responseMimeType: "application/json" },
-    });
-    const result = await model.generateContent(prompt);
-    const json = JSON.parse(result.response.text());
-    trackTokens(Math.ceil(result.response.usageMetadata?.totalTokenCount ?? 150));
-    return json as AIExerciseMatch[];
+    return await requestAiJson<AIExerciseMatch[]>("exercise", prompt);
   } catch (e) {
     console.warn("Gemini match failed, using mock", e);
     return mockExerciseMatch(text);
@@ -172,22 +200,12 @@ Workout: "${text}"`;
 export async function aiInsight(
   ctx: string,
 ): Promise<AIInsight> {
-  const client = getClient();
   const prompt = `You are a friendly fitness coach. Given today's data, write ONE short encouraging sentence (max 15 words). Return ONLY JSON: { insight: string }
 
 Data: ${ctx}`;
 
-  if (!client) return { insight: mockInsight(ctx) };
-
   try {
-    const model = client.getGenerativeModel({
-      model: "gemini-2.0-flash",
-      generationConfig: { responseMimeType: "application/json" },
-    });
-    const result = await model.generateContent(prompt);
-    const json = JSON.parse(result.response.text());
-    trackTokens(Math.ceil(result.response.usageMetadata?.totalTokenCount ?? 80));
-    return json as AIInsight;
+    return await requestAiJson<AIInsight>("insight", prompt);
   } catch (error) {
     console.warn("Gemini insight call failed, using mock", error);
     return { insight: mockInsight(ctx) };

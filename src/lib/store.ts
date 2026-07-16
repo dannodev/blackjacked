@@ -52,8 +52,10 @@ interface State {
   squad: Squad | null;
   setProfile: (p: Profile) => void;
   updateProfile: (patch: Partial<Profile>) => void;
+  setMeals: (meals: Meal[]) => void;
   addMeal: (m: Meal) => void;
   deleteMeal: (id: string) => void;
+  setExerciseLogs: (logs: ExerciseLog[]) => void;
   addExerciseLog: (e: ExerciseLog) => void;
   deleteExerciseLog: (id: string) => void;
   setWeightLogs: (logs: WeightLog[]) => void;
@@ -99,12 +101,28 @@ export const useStore = create<State>()(
       updateProfile: (patch) =>
         set((s) => (s.profile ? { profile: { ...s.profile, ...patch } } : {})),
 
+      setMeals: (meals) =>
+        set((s) => {
+          const localById = new Map(s.meals.map((meal) => [meal.id, meal]));
+          const mergedById = new Map(localById);
+          for (const meal of meals) mergedById.set(meal.id, meal);
+          return { meals: [...mergedById.values()] };
+        }),
+
       addMeal: (m) => {
         set((s) => ({ meals: [...s.meals, m] }));
         get().touchStreak();
       },
       deleteMeal: (id) =>
         set((s) => ({ meals: s.meals.filter((m) => m.id !== id) })),
+
+      setExerciseLogs: (logs) =>
+        set((s) => {
+          const localById = new Map(s.exerciseLogs.map((log) => [log.id, log]));
+          const mergedById = new Map(localById);
+          for (const log of logs) mergedById.set(log.id, log);
+          return { exerciseLogs: [...mergedById.values()] };
+        }),
 
       addExerciseLog: (e) => {
         set((s) => ({ exerciseLogs: [...s.exerciseLogs, e] }));

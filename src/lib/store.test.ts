@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import type { Meal, Profile, SquadMember } from "./types";
+import type { ExerciseLog, Meal, Profile, SquadMember } from "./types";
 
 // Mock idb-keyval before importing store
 vi.mock("idb-keyval", () => ({
@@ -56,6 +56,20 @@ function memberFixture(name: string): Omit<SquadMember, "id"> {
     kcal_in: 0,
     kcal_out: 0,
     streak: 0,
+  };
+}
+
+function exerciseLogFixture(patch: Partial<ExerciseLog> = {}): ExerciseLog {
+  return {
+    id: "exercise-1",
+    exercise_id: "run",
+    exercise_name: "Running",
+    category: "cardio",
+    mets: 9.8,
+    duration_min: 30,
+    kcal_burned: 300,
+    loggedAt: new Date().toISOString(),
+    ...patch,
   };
 }
 
@@ -139,6 +153,26 @@ describe("useStore", () => {
     });
   });
 
+  describe("setMeals", () => {
+    it("should merge remote meals without duplicating existing local meals", () => {
+      const localMeal = mealFixture({ id: "meal-1", total_kcal: 500 });
+      const remoteMeal = mealFixture({ id: "meal-2", total_kcal: 650 });
+      const updatedLocalMeal = mealFixture({ id: "meal-1", total_kcal: 550 });
+
+      useStore.getState().addMeal(localMeal);
+      useStore.getState().setMeals([updatedLocalMeal, remoteMeal]);
+
+      expect(useStore.getState().meals).toHaveLength(2);
+      expect(
+        useStore.getState().meals.find((meal) => meal.id === "meal-1")
+          ?.total_kcal,
+      ).toBe(550);
+      expect(
+        useStore.getState().meals.find((meal) => meal.id === "meal-2"),
+      ).toEqual(remoteMeal);
+    });
+  });
+
   describe("deleteMeal", () => {
     it("should remove meal by id", () => {
       const meal1 = mealFixture({ id: "meal-1", type: "breakfast" });
@@ -173,6 +207,33 @@ describe("useStore", () => {
     it("should set sleep hours", () => {
       useStore.getState().setSleep(8);
       expect(useStore.getState().sleepToday).toBe(8);
+    });
+  });
+
+  describe("setExerciseLogs", () => {
+    it("should merge remote exercise logs without duplicating local logs", () => {
+      const localLog = exerciseLogFixture({ id: "exercise-1", kcal_burned: 300 });
+      const remoteLog = exerciseLogFixture({
+        id: "exercise-2",
+        exercise_name: "Walking",
+        kcal_burned: 120,
+      });
+      const updatedLocalLog = exerciseLogFixture({
+        id: "exercise-1",
+        kcal_burned: 350,
+      });
+
+      useStore.getState().addExerciseLog(localLog);
+      useStore.getState().setExerciseLogs([updatedLocalLog, remoteLog]);
+
+      expect(useStore.getState().exerciseLogs).toHaveLength(2);
+      expect(
+        useStore.getState().exerciseLogs.find((log) => log.id === "exercise-1")
+          ?.kcal_burned,
+      ).toBe(350);
+      expect(
+        useStore.getState().exerciseLogs.find((log) => log.id === "exercise-2"),
+      ).toEqual(remoteLog);
     });
   });
 

@@ -4,12 +4,14 @@ import { motion } from "framer-motion";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
 import { useTodayData, sortToday } from "@/lib/use-today-data";
+import { useCloudMeals } from "@/lib/use-cloud-meals";
+import { useCloudExerciseLogs } from "@/lib/use-cloud-exercise-logs";
 import { computeDay, MEAL_LABELS, type Meal } from "@/lib/types";
 import { getCurrentMealOptions, getNextMealToLog } from "@/lib/menu-meals";
 import { makeId } from "@/lib/id";
 import { DeficitRing } from "@/components/deficit-ring";
 import { Card, CardContent } from "@/components/ui/card";
-import { Flame, Dumbbell, Droplets, Moon, TrendingUp, Play, ArrowRight, Utensils, Sparkles, Check, Trash2 } from "lucide-react";
+import { Flame, Dumbbell, Droplets, Moon, TrendingUp, Play, Utensils, Sparkles, Check, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { toast } from "sonner";
@@ -31,8 +33,8 @@ export default function DashboardPage() {
   const sleepToday = useStore((s) => s.sleepToday);
   const setWater = useStore((s) => s.setWater);
   const setSleep = useStore((s) => s.setSleep);
-  const addMeal = useStore((s) => s.addMeal);
-  const deleteExerciseLog = useStore((s) => s.deleteExerciseLog);
+  const { addMeal, deleteMeal } = useCloudMeals();
+  const { deleteExerciseLog } = useCloudExerciseLogs();
   const { meals, exerciseLogs } = useTodayData();
   const day = computeDay(meals, exerciseLogs, profile);
 
@@ -48,9 +50,9 @@ export default function DashboardPage() {
   const currentMealOptions = getCurrentMealOptions(profile.meal_schedule);
   const loggedMealNames = new Set(meals.flatMap((m) => m.items.map((i) => i.name)));
 
-  function quickLogRecommendation() {
+  async function quickLogRecommendation() {
     if (!recommendation) return;
-    addMeal({
+    await addMeal({
       id: makeId(),
       type: recommendation.type,
       loggedAt: new Date().toISOString(),
@@ -355,7 +357,14 @@ export default function DashboardPage() {
         ) : (
           <div className="space-y-2">
             {sortedMeals.map((m) => (
-              <MealRow key={m.id} meal={m} />
+              <MealRow
+                key={m.id}
+                meal={m}
+                onDelete={async () => {
+                  await deleteMeal(m.id);
+                  toast.success("Meal removed");
+                }}
+              />
             ))}
           </div>
         )}
@@ -404,8 +413,8 @@ export default function DashboardPage() {
                       type="button"
                       aria-label={`Delete ${e.exercise_name}`}
                       className="flex size-8 items-center justify-center rounded-full border border-white/10 text-muted-foreground transition-colors hover:border-[var(--over)]/40 hover:text-[var(--over)]"
-                      onClick={() => {
-                        deleteExerciseLog(e.id);
+                      onClick={async () => {
+                        await deleteExerciseLog(e.id);
                         toast.success("Workout removed");
                       }}
                     >
@@ -456,7 +465,13 @@ function MacroPill({
   );
 }
 
-function MealRow({ meal }: { meal: Meal }) {
+function MealRow({
+  meal,
+  onDelete,
+}: {
+  meal: Meal;
+  onDelete: () => void;
+}) {
   return (
     <Card className="carbon-card rounded-[1.35rem] border-white/7">
       <CardContent className="flex items-center justify-between py-3.5">
@@ -471,9 +486,16 @@ function MealRow({ meal }: { meal: Meal }) {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-1 text-[var(--rosso-light)]">
+        <div className="flex items-center gap-2 text-[var(--rosso-light)]">
           <span className="font-bold">{meal.total_kcal}</span>
-          <ArrowRight className="size-4" />
+          <button
+            type="button"
+            aria-label={`Delete ${MEAL_LABELS[meal.type]}`}
+            className="flex size-8 items-center justify-center rounded-full border border-white/10 text-muted-foreground transition-colors hover:border-[var(--over)]/40 hover:text-[var(--over)]"
+            onClick={onDelete}
+          >
+            <Trash2 className="size-4" />
+          </button>
         </div>
       </CardContent>
     </Card>

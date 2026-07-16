@@ -4,7 +4,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { aiFoodBreakdown, type AIFoodResult } from "@/lib/ai";
-import { useStore } from "@/lib/store";
+import { useCloudMeals } from "@/lib/use-cloud-meals";
 import { makeId } from "@/lib/id";
 import type { Meal, MealItem, MealType } from "@/lib/types";
 import { MEAL_LABELS } from "@/lib/types";
@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils";
 const MEAL_TYPES: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
 
 export function AiFoodLog() {
-  const addMeal = useStore((s) => s.addMeal);
+  const { addMeal } = useCloudMeals();
   const [text, setText] = useState("");
   const [mealType, setMealType] = useState<MealType>("lunch");
   const [loading, setLoading] = useState(false);
@@ -44,7 +44,7 @@ export function AiFoodLog() {
     }
   }
 
-  function confirm() {
+  async function confirm() {
     if (!result) return;
     const items: MealItem[] = result.ingredients.map((ing) => ({
       food_item_id: makeId(),
@@ -66,7 +66,7 @@ export function AiFoodLog() {
       c: result.total_carb_g,
       items,
     };
-    addMeal(meal);
+    await addMeal(meal);
     toast.success(`${MEAL_LABELS[mealType]} logged`, {
       description: `${result.total_kcal} kcal · ${result.summary}`,
     });

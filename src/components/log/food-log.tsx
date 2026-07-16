@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useStore, useAllFoods } from "@/lib/store";
+import { useCloudMeals } from "@/lib/use-cloud-meals";
 import { makeId } from "@/lib/id";
 import type { FoodItem, Meal, MealItem, MealType } from "@/lib/types";
 import { MEAL_LABELS } from "@/lib/types";
@@ -85,7 +86,7 @@ function SubTabBtn({
 
 /* ============ Menu Meals (from PDF) ============ */
 function MenuMealsLog() {
-  const addMeal = useStore((s) => s.addMeal);
+  const { addMeal } = useCloudMeals();
   const profile = useStore((s) => s.profile)!;
   const [logged, setLogged] = useState<Set<string>>(new Set());
   const [dayFilter, setDayFilter] = useState("All");
@@ -99,7 +100,7 @@ function MenuMealsLog() {
     });
   }, [dayFilter, mealFilter]);
 
-  function logPreset(preset: MenuMealPreset) {
+  async function logPreset(preset: MenuMealPreset) {
     const meal: Meal = {
       id: makeId(),
       type: preset.type,
@@ -121,7 +122,7 @@ function MenuMealsLog() {
         },
       ],
     };
-    addMeal(meal);
+    await addMeal(meal);
     setLogged((s) => new Set([...s, preset.id]));
     toast.success(`${preset.name} logged`, {
       description: `${preset.kcal} kcal · P${preset.protein_g}g C${preset.carb_g}g F${preset.fat_g}g`,
@@ -248,7 +249,7 @@ function MenuMealsLog() {
 /* ============ Search Foods ============ */
 function SearchFoodsLog() {
   const foods = useAllFoods();
-  const addMeal = useStore((s) => s.addMeal);
+  const { addMeal } = useCloudMeals();
   const [query, setQuery] = useState("");
   const [mealType, setMealType] = useState<MealType>(inferMealType());
   const [cart, setCart] = useState<{ item: FoodItem; qty: number }[]>([]);
@@ -299,7 +300,7 @@ function SearchFoodsLog() {
     setCart((c) => c.filter((x) => x.item.id !== id));
   }
 
-  function save() {
+  async function save() {
     if (cart.length === 0) {
       toast.error("Add at least one food");
       return;
@@ -327,7 +328,7 @@ function SearchFoodsLog() {
       c: +cartTotals.c.toFixed(1),
       items,
     };
-    addMeal(meal);
+    await addMeal(meal);
     setCart([]);
     toast.success(`${MEAL_LABELS[mealType]} logged`, {
       description: `${cartTotals.kcal.toFixed(0)} kcal added to the ring`,
