@@ -6,7 +6,7 @@ import { useTodayData, sortToday } from "@/lib/use-today-data";
 import { computeDay, MEAL_LABELS, type Meal } from "@/lib/types";
 import { DeficitRing } from "@/components/deficit-ring";
 import { Card, CardContent } from "@/components/ui/card";
-import { Bolt, Flame, Dumbbell } from "lucide-react";
+import { Bolt, Flame, Dumbbell, Droplets, Moon } from "lucide-react";
 import Link from "next/link";
 
 const stagger = {
@@ -21,6 +21,10 @@ const item = {
 export default function DashboardPage() {
   const profile = useStore((s) => s.profile)!;
   const streaks = useStore((s) => s.streaks);
+  const waterToday = useStore((s) => s.waterToday);
+  const sleepToday = useStore((s) => s.sleepToday);
+  const setWater = useStore((s) => s.setWater);
+  const setSleep = useStore((s) => s.setSleep);
   const { meals, exerciseLogs } = useTodayData();
   const day = computeDay(meals, exerciseLogs, profile);
 
@@ -106,6 +110,56 @@ export default function DashboardPage() {
         <MacroBar label="Protein" value={day.p} goal={profile.protein_goal} />
         <MacroBar label="Carbs" value={day.c} goal={profile.carb_goal} />
         <MacroBar label="Fat" value={day.f} goal={profile.fat_goal} />
+      </motion.div>
+
+      {/* hydration + sleep */}
+      <motion.div variants={item} className="grid grid-cols-2 gap-3">
+        <Card className="rounded-2xl border-white/5 bg-card/60 backdrop-blur-xl">
+          <CardContent className="py-4">
+            <div className="mb-2 flex items-center gap-2">
+              <Droplets className="size-4 text-[var(--lime)]" />
+              <span className="text-xs uppercase tracking-wide text-muted-foreground">Water</span>
+            </div>
+            <p className="font-heading text-xl font-bold">
+              {(waterToday / 1000).toFixed(1)}
+              <span className="text-sm text-muted-foreground">L</span>
+            </p>
+            <div className="mt-2 flex gap-1">
+              {[250, 500, 1000].map((ml) => (
+                <button
+                  key={ml}
+                  onClick={() => setWater(waterToday + ml)}
+                  className="flex-1 rounded-lg bg-white/5 py-1 text-xs text-muted-foreground hover:bg-[var(--lime)]/10 hover:text-[var(--lime)]"
+                >
+                  +{ml >= 1000 ? "1L" : `${ml}ml`}
+                </button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="rounded-2xl border-white/5 bg-card/60 backdrop-blur-xl">
+          <CardContent className="py-4">
+            <div className="mb-2 flex items-center gap-2">
+              <Moon className="size-4 text-[var(--lime)]" />
+              <span className="text-xs uppercase tracking-wide text-muted-foreground">Sleep</span>
+            </div>
+            <p className="font-heading text-xl font-bold">
+              {sleepToday.toFixed(1)}
+              <span className="text-sm text-muted-foreground">h</span>
+            </p>
+            <div className="mt-2 flex gap-1">
+              {[6, 7, 8].map((h) => (
+                <button
+                  key={h}
+                  onClick={() => setSleep(h)}
+                  className="flex-1 rounded-lg bg-white/5 py-1 text-xs text-muted-foreground hover:bg-[var(--lime)]/10 hover:text-[var(--lime)]"
+                >
+                  {h}h
+                </button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </motion.div>
 
       {/* meals */}

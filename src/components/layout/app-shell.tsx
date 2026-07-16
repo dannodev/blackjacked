@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Plus, BarChart3, User, LogOut } from "lucide-react";
+import { Home, Plus, BarChart3, User, LogOut, Utensils, ChefHat, Scale } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/lib/auth";
 import { Wordmark } from "@/components/brand/wordmark";
@@ -19,7 +19,9 @@ import { cn } from "@/lib/utils";
 
 const nav = [
   { href: "/dashboard", label: "Today", icon: Home },
+  { href: "/menu", label: "Menu", icon: Utensils },
   { href: "/stats", label: "Stats", icon: BarChart3 },
+  { href: "/recipes", label: "Recipes", icon: ChefHat },
   { href: "/profile", label: "Profile", icon: User },
 ];
 

@@ -10,10 +10,11 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ACTIVITY_OPTIONS } from "@/lib/types";
-import { Bolt } from "lucide-react";
+import { Bolt, Bell, BellOff } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useState, useEffect } from "react";
 
 export default function ProfilePage() {
   const { user, signOut } = useAuth();
@@ -21,6 +22,38 @@ export default function ProfilePage() {
   const streaks = useStore((s) => s.streaks);
   const resetAll = useStore((s) => s.resetAll);
   const router = useRouter();
+  const [remindersOn, setRemindersOn] = useState(false);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("blackjacked.reminders");
+    setRemindersOn(stored === "true");
+  }, []);
+
+  function toggleReminders() {
+    const next = !remindersOn;
+    setRemindersOn(next);
+    localStorage.setItem("blackjacked.reminders", String(next));
+    if (next && "Notification" in window) {
+      Notification.requestPermission().then((p) => {
+        if (p === "granted") {
+          toast.success("Reminders on", {
+            description: "You'll get a daily nudge to log.",
+          });
+        } else {
+          toast.info("Notifications blocked", {
+            description: "Enable in browser settings to get reminders.",
+          });
+          setRemindersOn(false);
+          localStorage.setItem("blackjacked.reminders", "false");
+        }
+      });
+    } else if (next) {
+      toast.info("This browser doesn't support notifications");
+      setRemindersOn(false);
+    } else {
+      toast.success("Reminders off");
+    }
+  }
 
   const activity = ACTIVITY_OPTIONS.find(
     (o) => o.value === profile.activity_factor,
@@ -77,6 +110,29 @@ export default function ProfilePage() {
       </Card>
 
       <div className="space-y-2">
+        <button
+          onClick={toggleReminders}
+          className="flex w-full items-center justify-between rounded-2xl border border-white/5 bg-card/60 px-4 py-3 backdrop-blur-xl"
+        >
+          <div className="flex items-center gap-2">
+            {remindersOn ? (
+              <Bell className="size-4 text-[var(--lime)]" />
+            ) : (
+              <BellOff className="size-4 text-muted-foreground" />
+            )}
+            <span className="text-sm">Daily reminders</span>
+          </div>
+          <span
+            className={
+              "rounded-full px-2 py-0.5 text-xs font-medium " +
+              (remindersOn
+                ? "bg-[var(--lime)]/15 text-[var(--lime)]"
+                : "bg-white/5 text-muted-foreground")
+            }
+          >
+            {remindersOn ? "On" : "Off"}
+          </span>
+        </button>
         <Link href="/onboarding">
           <Button variant="outline" className="w-full">
             Edit profile & goals
