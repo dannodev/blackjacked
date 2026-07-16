@@ -17,7 +17,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { Search, Plus } from "lucide-react";
+import { Search, Plus, Sparkles, Loader2 } from "lucide-react";
+import { aiExerciseMatch } from "@/lib/ai";
 
 const CATEGORIES: (ExerciseCategory | "all")[] = [
   "all",
@@ -38,6 +39,8 @@ export function ExerciseLogForm() {
   const [distance, setDistance] = useState(0);
   const [sets, setSets] = useState(3);
   const [reps, setReps] = useState(10);
+  const [aiQuery, setAiQuery] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
 
   const list = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -83,6 +86,36 @@ export function ExerciseLogForm() {
     setDistance(0);
   }
 
+  async function aiMatch() {
+    if (!aiQuery.trim()) {
+      toast.error("Describe your workout");
+      return;
+    }
+    setAiLoading(true);
+    try {
+      const matches = await aiExerciseMatch(aiQuery);
+      if (matches.length > 0) {
+        const best = matches[0];
+        const ex = EXERCISES.find((e) => e.id === best.exercise_id) ||
+          EXERCISES.find((e) => e.name.toLowerCase() === best.name.toLowerCase());
+        if (ex) {
+          setSelected(ex);
+          setCat(ex.category);
+          toast.success(`Matched: ${ex.name}`, {
+            description: `${(best.confidence * 100).toFixed(0)}% confidence`,
+          });
+        } else {
+          toast.info(`AI suggested "${best.name}" — pick from the list below`);
+        }
+      }
+      setAiQuery("");
+    } catch {
+      toast.error("AI match failed");
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
       {/* categories */}
@@ -103,6 +136,31 @@ export function ExerciseLogForm() {
           </button>
         ))}
       </div>
+
+      {/* AI free-text workout match */}
+      {!selected && (
+        <div className="flex gap-2">
+          <Input
+            placeholder="e.g. 30 min run on the treadmill"
+            value={aiQuery}
+            onChange={(e) => setAiQuery(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && aiMatch()}
+            className="flex-1"
+          />
+          <Button
+            variant="outline"
+            onClick={aiMatch}
+            disabled={aiLoading}
+            className="border-[var(--lime)]/30 text-[var(--lime)]"
+          >
+            {aiLoading ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Sparkles className="size-4" />
+            )}
+          </Button>
+        </div>
+      )}
 
       {/* search */}
       <div className="relative">
