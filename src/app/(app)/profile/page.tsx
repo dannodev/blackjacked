@@ -17,7 +17,7 @@ import { Bolt, Bell, BellOff, Camera, Clock3, Target, Trash2, Users } from "luci
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { memo, useEffect, useState } from "react";
 import { saveSupabaseProfile } from "@/lib/supabase/profile";
 
 function emptySchedule(): Required<Record<keyof MealSchedule, string>> {
@@ -126,17 +126,6 @@ export default function ProfilePage() {
   const [remindersOn, setRemindersOn] = useState(false);
   const [savingTimes, setSavingTimes] = useState(false);
   const [savingGoal, setSavingGoal] = useState(false);
-  const [mealTimes, setMealTimes] = useState(() =>
-    normalizeSchedule(profile.meal_schedule),
-  );
-  const [goalDraft, setGoalDraft] = useState(() => {
-    const goal = normalizeGoal(profile);
-    return {
-      goal_mode: goal.mode,
-      goal_target_weight_kg: goal.targetWeight,
-      goal_target_date: goal.targetDate ?? "",
-    };
-  });
   const [savingAvatar, setSavingAvatar] = useState(false);
 
   useEffect(() => {
@@ -174,14 +163,7 @@ export default function ProfilePage() {
     (o) => o.value === profile.activity_factor,
   );
 
-  async function saveMealTimes() {
-    const meal_schedule: MealSchedule = {
-      breakfast_time: mealTimes.breakfast_time || null,
-      am_snack_time: mealTimes.am_snack_time || null,
-      lunch_time: mealTimes.lunch_time || null,
-      pm_snack_time: mealTimes.pm_snack_time || null,
-      dinner_time: mealTimes.dinner_time || null,
-    };
+  async function saveMealTimes(meal_schedule: MealSchedule) {
     const nextProfile = { ...profile, meal_schedule };
 
     try {
@@ -198,7 +180,7 @@ export default function ProfilePage() {
     }
   }
 
-  async function saveGoal() {
+  async function saveGoal(goalDraft: GoalDraft) {
     const nextProfile = {
       ...profile,
       goal_mode: goalDraft.goal_mode,
@@ -365,153 +347,18 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
-      <Card className="carbon-card rounded-[1.5rem] border-white/7">
-        <CardHeader>
-          <CardTitle className="font-heading text-base flex items-center gap-2">
-            <Target className="size-4 text-[var(--rosso-light)]" />
-            Long-term goal
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-3 gap-2">
-            {(["lose", "maintain", "gain"] as const).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                onClick={() =>
-                  setGoalDraft((current) => ({
-                    ...current,
-                    goal_mode: mode,
-                    goal_target_weight_kg:
-                      mode === "maintain"
-                        ? profile.current_weight_kg
-                        : current.goal_target_weight_kg,
-                  }))
-                }
-                className={
-                  "rounded-full border px-2 py-2 text-xs font-semibold capitalize transition-colors " +
-                  (goalDraft.goal_mode === mode
-                    ? "border-[var(--rosso)] bg-[var(--rosso)]/12 text-[var(--rosso-light)]"
-                    : "border-white/10 text-muted-foreground")
-                }
-              >
-                {mode}
-              </button>
-            ))}
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label htmlFor="profile-target-weight" className="text-xs">
-                Target weight (kg)
-              </Label>
-              <Input
-                id="profile-target-weight"
-                type="number"
-                step="0.1"
-                value={goalDraft.goal_target_weight_kg}
-                disabled={goalDraft.goal_mode === "maintain"}
-                onChange={(event) =>
-                  setGoalDraft((current) => ({
-                    ...current,
-                    goal_target_weight_kg: +event.target.value,
-                  }))
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="profile-target-date" className="text-xs">
-                Target date
-              </Label>
-              <Input
-                id="profile-target-date"
-                type="date"
-                value={goalDraft.goal_target_date}
-                onChange={(event) =>
-                  setGoalDraft((current) => ({
-                    ...current,
-                    goal_target_date: event.target.value,
-                  }))
-                }
-              />
-            </div>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Squad members only see your goal type and progress percentage,
-            never your actual weight or height.
-          </p>
-          <Button
-            className="w-full bg-[var(--rosso)] font-semibold text-white hover:bg-[var(--rosso)]/90"
-            onClick={saveGoal}
-            disabled={savingGoal}
-          >
-            {savingGoal ? "Saving..." : "Save goal"}
-          </Button>
-        </CardContent>
-      </Card>
+      <GoalSettingsCard
+        currentWeight={profile.current_weight_kg}
+        initialGoal={normalizeGoal(profile)}
+        saving={savingGoal}
+        onSave={saveGoal}
+      />
 
-      <Card className="carbon-card rounded-[1.5rem] border-white/7">
-        <CardHeader>
-          <CardTitle className="font-heading text-base flex items-center gap-2">
-            <Clock3 className="size-4 text-[var(--rosso-light)]" />
-            Meal times
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-xs text-muted-foreground">
-            The dashboard uses these times to show breakfast, snack, lunch, or
-            dinner options from your menu.
-          </p>
-          <div className="grid grid-cols-2 gap-3">
-            <MealTimeInput
-              id="profile-breakfast"
-              label="Breakfast"
-              value={mealTimes.breakfast_time}
-              onChange={(value) =>
-                setMealTimes((current) => ({ ...current, breakfast_time: value }))
-              }
-            />
-            <MealTimeInput
-              id="profile-am-snack"
-              label="AM snack"
-              value={mealTimes.am_snack_time}
-              onChange={(value) =>
-                setMealTimes((current) => ({ ...current, am_snack_time: value }))
-              }
-            />
-            <MealTimeInput
-              id="profile-lunch"
-              label="Lunch"
-              value={mealTimes.lunch_time}
-              onChange={(value) =>
-                setMealTimes((current) => ({ ...current, lunch_time: value }))
-              }
-            />
-            <MealTimeInput
-              id="profile-pm-snack"
-              label="PM snack"
-              value={mealTimes.pm_snack_time}
-              onChange={(value) =>
-                setMealTimes((current) => ({ ...current, pm_snack_time: value }))
-              }
-            />
-            <MealTimeInput
-              id="profile-dinner"
-              label="Dinner"
-              value={mealTimes.dinner_time}
-              onChange={(value) =>
-                setMealTimes((current) => ({ ...current, dinner_time: value }))
-              }
-            />
-          </div>
-          <Button
-            className="w-full bg-[var(--rosso)] font-semibold text-white hover:bg-[var(--rosso)]/90"
-            onClick={saveMealTimes}
-            disabled={savingTimes}
-          >
-            {savingTimes ? "Saving..." : "Save meal times"}
-          </Button>
-        </CardContent>
-      </Card>
+      <MealTimesSettingsCard
+        initialSchedule={profile.meal_schedule}
+        saving={savingTimes}
+        onSave={saveMealTimes}
+      />
 
       <div className="space-y-2">
         <button
@@ -601,6 +448,208 @@ function MealTimeInput({
     </div>
   );
 }
+
+type GoalDraft = {
+  goal_mode: "lose" | "gain" | "maintain";
+  goal_target_weight_kg?: number;
+  goal_target_date: string;
+};
+
+const GoalSettingsCard = memo(function GoalSettingsCard({
+  currentWeight,
+  initialGoal,
+  saving,
+  onSave,
+}: {
+  currentWeight: number;
+  initialGoal: ReturnType<typeof normalizeGoal>;
+  saving: boolean;
+  onSave: (draft: GoalDraft) => void | Promise<void>;
+}) {
+  const [goalDraft, setGoalDraft] = useState<GoalDraft>(() => ({
+    goal_mode: initialGoal.mode,
+    goal_target_weight_kg: initialGoal.targetWeight,
+    goal_target_date: initialGoal.targetDate ?? "",
+  }));
+
+  return (
+    <Card className="carbon-card rounded-[1.5rem] border-white/7">
+      <CardHeader>
+        <CardTitle className="font-heading text-base flex items-center gap-2">
+          <Target className="size-4 text-[var(--rosso-light)]" />
+          Long-term goal
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-3 gap-2">
+          {(["lose", "maintain", "gain"] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() =>
+                setGoalDraft((current) => ({
+                  ...current,
+                  goal_mode: mode,
+                  goal_target_weight_kg:
+                    mode === "maintain"
+                      ? currentWeight
+                      : current.goal_target_weight_kg,
+                }))
+              }
+              className={
+                "rounded-full border px-2 py-2 text-xs font-semibold capitalize transition-colors " +
+                (goalDraft.goal_mode === mode
+                  ? "border-[var(--rosso)] bg-[var(--rosso)]/12 text-[var(--rosso-light)]"
+                  : "border-white/10 text-muted-foreground")
+              }
+            >
+              {mode}
+            </button>
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <Label htmlFor="profile-target-weight" className="text-xs">
+              Target weight (kg)
+            </Label>
+            <Input
+              id="profile-target-weight"
+              type="number"
+              step="0.1"
+              value={goalDraft.goal_target_weight_kg ?? ""}
+              disabled={goalDraft.goal_mode === "maintain"}
+              onChange={(event) =>
+                setGoalDraft((current) => ({
+                  ...current,
+                  goal_target_weight_kg: event.target.value
+                    ? +event.target.value
+                    : undefined,
+                }))
+              }
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="profile-target-date" className="text-xs">
+              Target date
+            </Label>
+            <Input
+              id="profile-target-date"
+              type="date"
+              value={goalDraft.goal_target_date}
+              onChange={(event) =>
+                setGoalDraft((current) => ({
+                  ...current,
+                  goal_target_date: event.target.value,
+                }))
+              }
+            />
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Squad members only see your goal type and progress percentage,
+          never your actual weight or height.
+        </p>
+        <Button
+          className="w-full bg-[var(--rosso)] font-semibold text-white hover:bg-[var(--rosso)]/90"
+          onClick={() => void onSave(goalDraft)}
+          disabled={saving}
+        >
+          {saving ? "Saving..." : "Save goal"}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+});
+
+const MealTimesSettingsCard = memo(function MealTimesSettingsCard({
+  initialSchedule,
+  saving,
+  onSave,
+}: {
+  initialSchedule?: MealSchedule;
+  saving: boolean;
+  onSave: (schedule: MealSchedule) => void | Promise<void>;
+}) {
+  const [mealTimes, setMealTimes] = useState(() =>
+    normalizeSchedule(initialSchedule),
+  );
+
+  function save() {
+    void onSave({
+      breakfast_time: mealTimes.breakfast_time || null,
+      am_snack_time: mealTimes.am_snack_time || null,
+      lunch_time: mealTimes.lunch_time || null,
+      pm_snack_time: mealTimes.pm_snack_time || null,
+      dinner_time: mealTimes.dinner_time || null,
+    });
+  }
+
+  return (
+    <Card className="carbon-card rounded-[1.5rem] border-white/7">
+      <CardHeader>
+        <CardTitle className="font-heading text-base flex items-center gap-2">
+          <Clock3 className="size-4 text-[var(--rosso-light)]" />
+          Meal times
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-xs text-muted-foreground">
+          The dashboard uses these times to show breakfast, snack, lunch, or
+          dinner options from your menu.
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <MealTimeInput
+            id="profile-breakfast"
+            label="Breakfast"
+            value={mealTimes.breakfast_time}
+            onChange={(value) =>
+              setMealTimes((current) => ({ ...current, breakfast_time: value }))
+            }
+          />
+          <MealTimeInput
+            id="profile-am-snack"
+            label="AM snack"
+            value={mealTimes.am_snack_time}
+            onChange={(value) =>
+              setMealTimes((current) => ({ ...current, am_snack_time: value }))
+            }
+          />
+          <MealTimeInput
+            id="profile-lunch"
+            label="Lunch"
+            value={mealTimes.lunch_time}
+            onChange={(value) =>
+              setMealTimes((current) => ({ ...current, lunch_time: value }))
+            }
+          />
+          <MealTimeInput
+            id="profile-pm-snack"
+            label="PM snack"
+            value={mealTimes.pm_snack_time}
+            onChange={(value) =>
+              setMealTimes((current) => ({ ...current, pm_snack_time: value }))
+            }
+          />
+          <MealTimeInput
+            id="profile-dinner"
+            label="Dinner"
+            value={mealTimes.dinner_time}
+            onChange={(value) =>
+              setMealTimes((current) => ({ ...current, dinner_time: value }))
+            }
+          />
+        </div>
+        <Button
+          className="w-full bg-[var(--rosso)] font-semibold text-white hover:bg-[var(--rosso)]/90"
+          onClick={save}
+          disabled={saving}
+        >
+          {saving ? "Saving..." : "Save meal times"}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+});
 
 function Stat({
   label,

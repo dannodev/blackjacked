@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import {
   authErrorMessage,
+  emailSchema,
   passwordRules,
   passwordSchema,
 } from "@/lib/auth-validation";
@@ -28,7 +29,7 @@ import {
 
 const schema = z.object({
   name: z.string().min(2, "Tell us your name"),
-  email: z.string().email("Use a valid email address."),
+  email: emailSchema,
   password: passwordSchema,
 });
 

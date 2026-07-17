@@ -65,6 +65,11 @@ const E2E_PROFILE = {
   },
 };
 
+function authRedirectTo(path: string) {
+  if (typeof window === "undefined") return undefined;
+  return `${window.location.origin}${path}`;
+}
+
 function canUseE2EAuthBypass() {
   const search = typeof window !== "undefined" ? window.location.search : "";
   const isLocalhost =
@@ -193,7 +198,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { error } = await supabase.auth.signUp({
           email,
           password,
-          options: { data: { name } },
+          options: {
+            data: { name },
+            emailRedirectTo: authRedirectTo("/onboarding"),
+          },
         });
         if (error) throw error;
         const { data: userData } = await supabase.auth.getUser();

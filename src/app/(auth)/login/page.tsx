@@ -9,7 +9,7 @@ import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
-import { authErrorMessage, passwordSchema } from "@/lib/auth-validation";
+import { authErrorMessage, emailSchema, passwordSchema } from "@/lib/auth-validation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/card";
 
 const schema = z.object({
-  email: z.string().email("Use a valid email address."),
+  email: emailSchema,
   password: passwordSchema,
 });
 
