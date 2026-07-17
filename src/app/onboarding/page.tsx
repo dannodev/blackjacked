@@ -45,7 +45,10 @@ const goalSchema = z.object({
   fat_goal: z.coerce.number().min(0),
   carb_goal: z.coerce.number().min(0),
   goal_mode: z.enum(["lose", "gain", "maintain"]),
-  goal_target_weight_kg: z.coerce.number().min(35).max(300).optional(),
+  goal_target_weight_kg: z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    z.coerce.number().min(35).max(300).optional(),
+  ),
   goal_target_date: z.string().optional(),
   breakfast_time: z.string().optional(),
   lunch_time: z.string().optional(),
@@ -132,7 +135,38 @@ export default function OnboardingPage() {
     setStep(2);
   };
 
-  const onGoalSubmit = async (values: Goal) => {
+  function goalDefaults(): Goal {
+    const b = basicsForm.getValues();
+    const currentWeight = Number(b.current_weight_kg) || 80;
+    const calories = suggestion?.goalCal ?? 1900;
+    return {
+      activity_factor: (Number(goalForm.getValues("activity_factor")) || 1.55) as ActivityFactor,
+      calorie_goal: calories,
+      protein_goal: suggestion?.protein ?? Math.round(currentWeight * 1.6),
+      fat_goal: suggestion?.fat ?? Math.round((calories * 0.25) / 9),
+      carb_goal:
+        suggestion?.carb ??
+        Math.max(
+          0,
+          Math.round(
+            (calories -
+              (suggestion?.protein ?? Math.round(currentWeight * 1.6)) * 4 -
+              (suggestion?.fat ?? Math.round((calories * 0.25) / 9)) * 9) /
+              4,
+          ),
+        ),
+      goal_mode: "maintain",
+      goal_target_weight_kg: currentWeight,
+      goal_target_date: "",
+      breakfast_time: "",
+      lunch_time: "",
+      dinner_time: "",
+      am_snack_time: "",
+      pm_snack_time: "",
+    };
+  }
+
+  async function saveGoal(values: Goal) {
     const b = basicsForm.getValues();
     const profile = {
       sex: b.sex,
@@ -175,7 +209,39 @@ export default function OnboardingPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  const onGoalSubmit = async (values: Goal) => {
+    await saveGoal(values);
   };
+
+  async function skipTargetsAndMealTimes() {
+    goalForm.clearErrors();
+    await saveGoal(goalDefaults());
+  }
+
+  async function skipMealTimes() {
+    const values = goalForm.getValues();
+    const isValid = await goalForm.trigger([
+      "activity_factor",
+      "calorie_goal",
+      "protein_goal",
+      "fat_goal",
+      "carb_goal",
+      "goal_mode",
+      "goal_target_weight_kg",
+      "goal_target_date",
+    ]);
+    if (!isValid) return;
+    await saveGoal({
+      ...values,
+      breakfast_time: "",
+      lunch_time: "",
+      dinner_time: "",
+      am_snack_time: "",
+      pm_snack_time: "",
+    });
+  }
 
   return (
     <div className="flex flex-1 flex-col">
@@ -350,9 +416,20 @@ export default function OnboardingPage() {
           >
             <Card className="premium-panel rounded-[1.6rem]">
               <CardHeader>
-                <CardTitle className="font-heading text-base">
-                  Your targets
-                </CardTitle>
+                <div className="flex items-center justify-between gap-3">
+                  <CardTitle className="font-heading text-base">
+                    Your targets
+                  </CardTitle>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-8 px-3 text-xs text-muted-foreground"
+                    disabled={saving}
+                    onClick={skipTargetsAndMealTimes}
+                  >
+                    Skip for now
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 {suggestion && (
@@ -469,9 +546,20 @@ export default function OnboardingPage() {
             </Card>
             <Card className="carbon-card rounded-[1.6rem] border-white/7">
               <CardHeader>
-                <CardTitle className="font-heading text-base">
-                  Meal times
-                </CardTitle>
+                <div className="flex items-center justify-between gap-3">
+                  <CardTitle className="font-heading text-base">
+                    Meal times
+                  </CardTitle>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-8 px-3 text-xs text-muted-foreground"
+                    disabled={saving}
+                    onClick={skipMealTimes}
+                  >
+                    Skip meal times
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-xs text-muted-foreground">
