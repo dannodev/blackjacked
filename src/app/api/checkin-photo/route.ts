@@ -83,8 +83,9 @@ export async function POST(request: Request) {
   const result = (await response.json()) as CloudinaryResponse;
 
   if (!response.ok || !result.secure_url) {
+    console.error("Cloudinary check-in upload failed", result.error);
     return NextResponse.json(
-      { error: result.error?.message ?? "Cloudinary upload failed." },
+      { error: "Photo upload failed. Try again in a moment." },
       { status: response.status || 502 },
     );
   }

@@ -1,36 +1,61 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# BlackJacked
 
-## Getting Started
+Production fitness tracker for meals, workouts, progress check-ins, goals, and squads.
 
-First, run the development server:
+## Production Environment
+
+Set these in Vercel Project Settings -> Environment Variables.
+
+Public browser variables:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Server-only variables:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+GEMINI_API_KEY=
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Never add server-only values to `NEXT_PUBLIC_*`, and never commit `.env.local`.
 
-## Learn More
+## Supabase
 
-To learn more about Next.js, take a look at the following resources:
+Before deploying a new database change:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+supabase migration list --linked
+supabase db advisors --linked --fail-on none
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Expected known warning on the free plan:
 
-## Deploy on Vercel
+```text
+auth_leaked_password_protection
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+All public app tables should have RLS enabled and forced. Browser roles should not have `TRUNCATE`, `TRIGGER`, or `REFERENCES` table privileges.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Local Verification
+
+Run this before pushing a production deployment:
+
+```bash
+npm run lint
+npm test
+npm run build
+npm run test:e2e
+npm audit --omit=dev
+```
+
+## Vercel Deploy
+
+1. Import the GitHub repository into Vercel.
+2. Add all production environment variables above.
+3. Deploy from `main`.
+4. After deploy, test sign-up, sign-in, AI macros, menu import, avatar upload, progress photo upload, and squad join.

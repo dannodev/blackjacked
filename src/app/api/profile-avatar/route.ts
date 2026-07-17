@@ -115,7 +115,11 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   if (profileError) {
-    return NextResponse.json({ error: profileError.message }, { status: 400 });
+    console.error("Profile avatar lookup failed", profileError);
+    return NextResponse.json(
+      { error: "Could not prepare your profile picture upload." },
+      { status: 400 },
+    );
   }
 
   const uploadForm = new FormData();
@@ -139,8 +143,9 @@ export async function POST(request: Request) {
   const result = (await response.json()) as CloudinaryResponse;
 
   if (!response.ok || !result.secure_url || !result.public_id) {
+    console.error("Cloudinary avatar upload failed", result.error);
     return NextResponse.json(
-      { error: result.error?.message ?? "Cloudinary upload failed." },
+      { error: "Profile picture upload failed. Try again in a moment." },
       { status: response.status || 502 },
     );
   }
@@ -155,7 +160,11 @@ export async function POST(request: Request) {
 
   if (updateError) {
     await deleteCloudinaryImage(config, result.public_id);
-    return NextResponse.json({ error: updateError.message }, { status: 400 });
+    console.error("Profile avatar update failed", updateError);
+    return NextResponse.json(
+      { error: "Could not save your profile picture." },
+      { status: 400 },
+    );
   }
 
   await deleteCloudinaryImage(
@@ -193,7 +202,11 @@ export async function DELETE() {
     .maybeSingle();
 
   if (profileError) {
-    return NextResponse.json({ error: profileError.message }, { status: 400 });
+    console.error("Profile avatar lookup failed", profileError);
+    return NextResponse.json(
+      { error: "Could not find your profile picture." },
+      { status: 400 },
+    );
   }
 
   const { error: updateError } = await supabase
@@ -202,7 +215,11 @@ export async function DELETE() {
     .eq("id", data.user.id);
 
   if (updateError) {
-    return NextResponse.json({ error: updateError.message }, { status: 400 });
+    console.error("Profile avatar removal failed", updateError);
+    return NextResponse.json(
+      { error: "Could not remove your profile picture." },
+      { status: 400 },
+    );
   }
 
   await deleteCloudinaryImage(

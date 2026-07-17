@@ -136,7 +136,7 @@ ${menuText ? `\nPasted menu text:\n${menuText}` : ""}`;
         }
       : null;
 
-    let lastError = "Gemini menu import failed.";
+    let lastError: unknown = null;
 
     for (const modelName of MODELS) {
       try {
@@ -159,14 +159,20 @@ ${menuText ? `\nPasted menu text:\n${menuText}` : ""}`;
           tokens: result.response.usageMetadata?.totalTokenCount ?? 0,
         });
       } catch (error) {
-        lastError = error instanceof Error ? error.message : lastError;
+        lastError = error;
       }
     }
 
-    return NextResponse.json({ error: lastError }, { status: 502 });
+    console.error("Gemini menu import failed", lastError);
+    return NextResponse.json(
+      { error: "Menu import is temporarily unavailable. Try again in a moment." },
+      { status: 502 },
+    );
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Gemini menu import failed.";
-    return NextResponse.json({ error: message }, { status: 502 });
+    console.error("Gemini menu import failed", error);
+    return NextResponse.json(
+      { error: "Menu import is temporarily unavailable. Try again in a moment." },
+      { status: 502 },
+    );
   }
 }

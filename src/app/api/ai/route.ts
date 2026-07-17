@@ -111,7 +111,7 @@ export async function POST(request: Request) {
 
   try {
     const client = new GoogleGenerativeAI(key);
-    let lastError = "Gemini request failed.";
+    let lastError: unknown = null;
 
     for (const modelName of MODELS) {
       try {
@@ -128,7 +128,7 @@ export async function POST(request: Request) {
         try {
           data = JSON.parse(text);
         } catch {
-          lastError = `${modelName} returned invalid JSON.`;
+          lastError = new Error(`${modelName} returned invalid JSON.`);
           continue;
         }
 
@@ -138,14 +138,20 @@ export async function POST(request: Request) {
           tokens: result.response.usageMetadata?.totalTokenCount ?? 0,
         });
       } catch (error) {
-        lastError = error instanceof Error ? error.message : lastError;
+        lastError = error;
       }
     }
 
-    return NextResponse.json({ error: lastError }, { status: 502 });
+    console.error("Gemini AI request failed", lastError);
+    return NextResponse.json(
+      { error: "AI is temporarily unavailable. Try again in a moment." },
+      { status: 502 },
+    );
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Gemini request failed.";
-    return NextResponse.json({ error: message }, { status: 502 });
+    console.error("Gemini AI request failed", error);
+    return NextResponse.json(
+      { error: "AI is temporarily unavailable. Try again in a moment." },
+      { status: 502 },
+    );
   }
 }
