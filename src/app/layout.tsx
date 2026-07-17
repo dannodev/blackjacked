@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans, Sora } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
+import { Analytics } from "@vercel/analytics/next";
 
 const fontSans = Plus_Jakarta_Sans({
   variable: "--font-sans",
@@ -9,7 +10,6 @@ const fontSans = Plus_Jakarta_Sans({
   display: "swap",
   weight: ["400", "500", "600", "700", "800"],
 });
-
 const fontHeading = Sora({
   variable: "--font-heading",
   subsets: ["latin"],
@@ -52,6 +52,7 @@ export default function RootLayout({
         className={`${fontSans.variable} ${fontHeading.variable} antialiased`}
       >
         <Providers>{children}</Providers>
+        <Analytics />
       </body>
     </html>
   );
