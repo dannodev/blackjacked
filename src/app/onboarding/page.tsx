@@ -15,6 +15,7 @@ import {
   mifflinBMR,
   ageFromBirthdate,
   computeTDEE,
+  dateKey,
 } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -149,7 +150,7 @@ export default function OnboardingPage() {
         values.goal_mode === "maintain"
           ? b.current_weight_kg
           : values.goal_target_weight_kg,
-      goal_start_date: new Date().toISOString().slice(0, 10),
+      goal_start_date: dateKey(new Date()),
       goal_target_date: values.goal_target_date || undefined,
       meal_schedule: {
         breakfast_time: values.breakfast_time || null,

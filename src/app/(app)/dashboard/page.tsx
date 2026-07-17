@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
-import { useTodayData, sortToday } from "@/lib/use-today-data";
+import { useTodayData } from "@/lib/use-today-data";
 import { useCloudMeals } from "@/lib/use-cloud-meals";
 import { useCloudExerciseLogs } from "@/lib/use-cloud-exercise-logs";
-import { computeDay, dateKey, exerciseKcal, MEAL_LABELS, type Exercise, type Meal } from "@/lib/types";
+import { computeDay, dateKey, exerciseKcal, type Exercise } from "@/lib/types";
 import {
   getCurrentMealOptions,
   MENU_MEAL_PRESETS,
@@ -16,7 +16,7 @@ import { CATEGORY_LABELS, EXERCISES } from "@/lib/exercises-seed";
 import { makeId } from "@/lib/id";
 import { DeficitRing } from "@/components/deficit-ring";
 import { Card, CardContent } from "@/components/ui/card";
-import { Flame, Droplets, Moon, TrendingUp, Utensils, Check, Trash2, Star } from "lucide-react";
+import { Flame, Droplets, Moon, Users, Check, Star, Target, Dumbbell, Utensils } from "lucide-react";
 import Link from "next/link";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { toast } from "sonner";
@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { saveSupabaseDailySummary } from "@/lib/supabase/daily-summary";
+import { loadMySquad, type SquadSnapshot } from "@/lib/supabase/squad";
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -42,13 +43,12 @@ export default function DashboardPage() {
   const customMenuMeals = useStore((s) => s.customMenuMeals);
   const useDefaultMenu = useStore((s) => s.useDefaultMenu);
   const favoriteExerciseIds = useStore((s) => s.favoriteExerciseIds);
-  const { addMeal, deleteMeal } = useCloudMeals();
+  const { addMeal } = useCloudMeals();
   const { addExerciseLog } = useCloudExerciseLogs();
   const [selectedMenuMeal, setSelectedMenuMeal] = useState<MenuMealOption | null>(null);
+  const [squadSnapshot, setSquadSnapshot] = useState<SquadSnapshot | null>(null);
   const { meals, exerciseLogs } = useTodayData();
   const day = computeDay(meals, exerciseLogs, profile);
-
-  const sortedMeals = sortToday(meals) as Meal[];
 
   const firstName = user?.name?.split(" ")[0] ?? "Athlete";
 
@@ -65,6 +65,20 @@ export default function DashboardPage() {
   const favoriteExercises = favoriteExerciseIds
     .map((id) => EXERCISES.find((exercise) => exercise.id === id))
     .filter((exercise): exercise is Exercise => Boolean(exercise));
+
+  useEffect(() => {
+    let cancelled = false;
+    loadMySquad()
+      .then((snapshot) => {
+        if (!cancelled) setSquadSnapshot(snapshot);
+      })
+      .catch(() => {
+        if (!cancelled) setSquadSnapshot(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function logMenuMeal(menuMeal: MenuMealOption) {
     await addMeal({
@@ -93,11 +107,11 @@ export default function DashboardPage() {
   }
 
   async function quickLogExercise(exercise: Exercise) {
+    const isTimedOnly = Boolean(exercise.timed_only || exercise.fixed_kcal_per_25_min);
     const isStrength =
-      exercise.category === "gym" ||
-      exercise.category === "core" ||
-      exercise.category === "calisthenics";
-    const duration = 30;
+      !isTimedOnly &&
+      ["gym", "core", "calisthenics"].includes(exercise.category);
+    const duration = exercise.fixed_kcal_per_25_min ? 25 : 30;
     const kcal = exerciseKcal(exercise, profile.current_weight_kg, duration);
 
     await addExerciseLog({
@@ -335,36 +349,90 @@ export default function DashboardPage() {
         </DialogContent>
       </Dialog>
 
-      {/* recent meals */}
+      {/* squad shortcut */}
       <div className="dashboard-item">
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="font-heading text-sm font-bold">My meals</h2>
+          <h2 className="font-heading text-sm font-bold">Squad pulse</h2>
           <Link
-            href="/log"
+            href="/squad"
             className="text-xs font-semibold text-[var(--rosso-light)] hover:underline"
           >
-            Your Menu
+            Open squad
           </Link>
         </div>
-        {sortedMeals.length === 0 ? (
-          <EmptyCard
-            icon={<Utensils className="size-5" />}
-            text="No meals logged yet. Tap a meal option above to fill the ring."
-            cta={{ href: "/log", label: "Log a meal" }}
-          />
-        ) : (
-          <div className="space-y-2">
-            {sortedMeals.map((m) => (
-              <MealRow
-                key={m.id}
-                meal={m}
-                onDelete={async () => {
-                  await deleteMeal(m.id);
-                  toast.success("Meal removed");
-                }}
-              />
-            ))}
+        {squadSnapshot && squadSnapshot.members.length > 0 ? (
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {squadSnapshot.members.map((member) => {
+              const latestActivity = [...squadSnapshot.activity]
+                .filter((activity) => activity.user_id === member.user_id)
+                .sort((a, b) => b.date.localeCompare(a.date))[0];
+              return (
+                <Link
+                  key={member.user_id}
+                  href="/squad"
+                  className="flex w-44 shrink-0 flex-col gap-2 rounded-[1.35rem] border border-white/7 bg-white/[0.045] p-3"
+                >
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="flex size-9 shrink-0 items-center justify-center rounded-2xl font-heading text-sm font-bold text-white"
+                      style={{ background: member.color }}
+                    >
+                      {member.display_name.slice(0, 2).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold">{member.display_name}</p>
+                      <p className="flex items-center gap-1 text-[11px] text-[var(--rosso-light)]">
+                        <Flame className="size-3" />
+                        {latestActivity?.streak ?? 0} streak
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5 text-[10px] text-muted-foreground">
+                    <SquadMiniStat
+                      icon={<Target className="size-3" />}
+                      value={`${Math.round(latestActivity?.goal_progress_pct ?? 0)}%`}
+                      label="goal"
+                    />
+                    <SquadMiniStat
+                      icon={<Dumbbell className="size-3" />}
+                      value={latestActivity?.exercise_done ? "done" : "pending"}
+                      label="workout"
+                    />
+                    <SquadMiniStat
+                      icon={<Utensils className="size-3" />}
+                      value={`${latestActivity?.meals_count ?? 0}`}
+                      label="meals"
+                    />
+                    <SquadMiniStat
+                      icon={<Flame className="size-3" />}
+                      value={`${(latestActivity?.goal_delta_kg ?? 0).toFixed(1)}kg`}
+                      label="progress"
+                    />
+                  </div>
+                </Link>
+              );
+            })}
           </div>
+        ) : (
+          <Card className="rounded-[1.5rem] border-dashed border-white/10 bg-white/[0.035]">
+            <CardContent className="flex items-center gap-3 py-4">
+              <div className="flex size-11 items-center justify-center rounded-2xl bg-[var(--rosso)]/12 text-[var(--rosso-light)]">
+                <Users className="size-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold">No squad yet</p>
+                <p className="text-xs text-muted-foreground">
+                  Join a squad to see friends here.
+                </p>
+              </div>
+              <Link
+                href="/squad"
+                className="rounded-full bg-[var(--rosso)] px-3 py-2 text-xs font-semibold text-white"
+              >
+                Squad
+              </Link>
+            </CardContent>
+          </Card>
         )}
       </div>
 
@@ -420,7 +488,13 @@ export default function DashboardPage() {
                   </p>
                   <p className="mt-1 text-[11px] text-muted-foreground">
                     {CATEGORY_LABELS[exercise.category]} · ~
-                    {Math.round(exerciseKcal(exercise, profile.current_weight_kg, 30))} kcal
+                    {Math.round(
+                      exerciseKcal(
+                        exercise,
+                        profile.current_weight_kg,
+                        exercise.fixed_kcal_per_25_min ? 25 : 30,
+                      ),
+                    )} kcal
                   </p>
                 </div>
               </button>
@@ -519,43 +593,6 @@ function MacroPill({
   );
 }
 
-function MealRow({
-  meal,
-  onDelete,
-}: {
-  meal: Meal;
-  onDelete: () => void;
-}) {
-  return (
-    <Card className="carbon-card rounded-[1.35rem] border-white/7">
-      <CardContent className="flex items-center justify-between py-3.5">
-        <div className="flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-2xl bg-[var(--rosso)]/12 text-[var(--rosso-light)]">
-            <TrendingUp className="size-5" />
-          </div>
-          <div>
-            <p className="text-sm font-medium">{MEAL_LABELS[meal.type]}</p>
-            <p className="text-xs text-muted-foreground">
-              P {Math.round(meal.p)} · C {Math.round(meal.c)} · F {Math.round(meal.f)}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 text-[var(--rosso-light)]">
-          <span className="font-bold">{meal.total_kcal}</span>
-          <button
-            type="button"
-            aria-label={`Delete ${MEAL_LABELS[meal.type]}`}
-            className="flex size-8 items-center justify-center rounded-full border border-white/10 text-muted-foreground transition-colors hover:border-[var(--over)]/40 hover:text-[var(--over)]"
-            onClick={onDelete}
-          >
-            <Trash2 className="size-4" />
-          </button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
 function MacroBox({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl border border-white/7 bg-white/[0.045] px-2 py-3">
@@ -569,29 +606,22 @@ function MacroBox({ label, value }: { label: string; value: string }) {
   );
 }
 
-function EmptyCard({
+function SquadMiniStat({
   icon,
-  text,
-  cta,
+  value,
+  label,
 }: {
   icon: React.ReactNode;
-  text: string;
-  cta: { href: string; label: string };
+  value: string;
+  label: string;
 }) {
   return (
-    <Card className="rounded-[1.5rem] border-dashed border-white/10 bg-white/[0.035]">
-      <CardContent className="flex flex-col items-center gap-3 py-8 text-center">
-        <div className="flex size-12 items-center justify-center rounded-2xl bg-[var(--rosso)]/12 text-[var(--rosso-light)]">
-          {icon}
-        </div>
-        <p className="max-w-xs text-sm text-muted-foreground">{text}</p>
-        <Link
-          href={cta.href}
-          className="rounded-full bg-[var(--rosso)] px-4 py-2 text-sm font-semibold text-white rosso-glow"
-        >
-          {cta.label}
-        </Link>
-      </CardContent>
-    </Card>
+    <div className="rounded-xl bg-black/25 px-2 py-1.5">
+      <div className="flex items-center gap-1 text-[var(--rosso-light)]">
+        {icon}
+        <span className="font-bold text-foreground">{value}</span>
+      </div>
+      <p>{label}</p>
+    </div>
   );
 }

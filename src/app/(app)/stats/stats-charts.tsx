@@ -15,15 +15,17 @@ import {
 
 type WeightPoint = {
   date: string;
-  weight: number;
+  weight?: number;
+  target_weight?: number;
 };
 
 type DeficitPoint = {
   date: string;
   label: string;
-  goal_deficit: number;
+  calorie_goal: number;
   real_deficit: number;
   kcal_in: number;
+  kcal_burned: number;
 };
 
 type WellnessPoint = {
@@ -61,6 +63,18 @@ export function WeightTrendChart({ data }: { data: WeightPoint[] }) {
           stroke="var(--rosso)"
           strokeWidth={2}
           fill="url(#weightGrad)"
+          name="Logged weight"
+          connectNulls
+        />
+        <Line
+          type="monotone"
+          dataKey="target_weight"
+          stroke="var(--amber)"
+          strokeWidth={2}
+          strokeDasharray="5 5"
+          dot={false}
+          name="Target pace"
+          connectNulls
         />
       </AreaChart>
     </ResponsiveContainer>
@@ -70,7 +84,7 @@ export function WeightTrendChart({ data }: { data: WeightPoint[] }) {
 export function DeficitChart({ data }: { data: DeficitPoint[] }) {
   return (
     <ResponsiveContainer width="100%" height={220}>
-      <ComposedChart data={data}>
+      <ComposedChart data={data} barGap={3} barCategoryGap="42%">
         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
         <XAxis dataKey="label" stroke="var(--muted-foreground)" fontSize={11} />
         <YAxis stroke="var(--muted-foreground)" fontSize={11} />
@@ -83,11 +97,20 @@ export function DeficitChart({ data }: { data: DeficitPoint[] }) {
           }}
         />
         <Bar
-          dataKey="goal_deficit"
+          dataKey="kcal_in"
           fill="var(--rosso)"
-          radius={[8, 8, 0, 0]}
-          opacity={0.6}
-          name="Goal deficit"
+          radius={0}
+          opacity={0.72}
+          barSize={10}
+          name="Calories eaten"
+        />
+        <Bar
+          dataKey="kcal_burned"
+          fill="var(--aqua)"
+          radius={0}
+          opacity={0.78}
+          barSize={10}
+          name="Workout burn"
         />
         <Line
           type="monotone"
@@ -99,12 +122,12 @@ export function DeficitChart({ data }: { data: DeficitPoint[] }) {
         />
         <Line
           type="monotone"
-          dataKey="kcal_in"
+          dataKey="calorie_goal"
           stroke="var(--over)"
           strokeWidth={1.5}
-          strokeDasharray="4 4"
+          strokeDasharray="5 5"
           dot={false}
-          name="kcal in"
+          name="Calorie goal"
         />
       </ComposedChart>
     </ResponsiveContainer>

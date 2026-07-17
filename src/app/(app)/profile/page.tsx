@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ACTIVITY_OPTIONS, normalizeGoal, type MealSchedule } from "@/lib/types";
+import { ACTIVITY_OPTIONS, dateKey, normalizeGoal, type MealSchedule } from "@/lib/types";
 import { Bolt, Bell, BellOff, Camera, Clock3, Target, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -209,7 +209,7 @@ export default function ProfilePage() {
           ? profile.current_weight_kg
           : goalDraft.goal_target_weight_kg,
       goal_start_date:
-        profile.goal_start_date ?? new Date().toISOString().slice(0, 10),
+        profile.goal_start_date ?? dateKey(new Date()),
       goal_target_date: goalDraft.goal_target_date || undefined,
     };
 

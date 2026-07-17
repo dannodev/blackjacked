@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
-import { computeDay, dateKey, normalizeGoal } from "@/lib/types";
+import { computeDay, dateKey, dateKeyFromDateTime, normalizeGoal } from "@/lib/types";
 import {
   Card,
   CardContent,
@@ -47,20 +47,12 @@ export default function StatsPage() {
   const dailySummaries = useStore((s) => s.dailySummaries);
 
   const dateWindow = useMemo(() => getDateWindow(range), [range]);
+  const rangeKeys = useMemo(() => fallbackDateKeys(dateWindow, range), [dateWindow, range]);
+  const goal = useMemo(() => normalizeGoal(profile), [profile]);
 
   const weightData = useMemo(
-    () =>
-      [...weightLogs]
-        .filter((w) => isInDateWindow(w.loggedAt.slice(0, 10), dateWindow))
-        .sort((a, b) => +new Date(a.loggedAt) - +new Date(b.loggedAt))
-        .map((w) => ({
-          date: new Date(w.loggedAt).toLocaleDateString(undefined, {
-            month: "short",
-            day: "numeric",
-          }),
-          weight: w.weight_kg,
-        })),
-    [dateWindow, weightLogs],
+    () => buildWeeklyWeightData(weightLogs, goal, dateWindow, range),
+    [dateWindow, goal, range, weightLogs],
   );
 
   const deficitData = useMemo(() => {
@@ -69,31 +61,31 @@ export default function StatsPage() {
     const summaryByDate = new Map(dailySummaries.map((summary) => [summary.date, summary]));
 
     for (const meal of meals) {
-      const key = meal.loggedAt.slice(0, 10);
+      const key = dateKeyFromDateTime(meal.loggedAt);
       const current = mealsByDate.get(key);
       if (current) current.push(meal);
       else mealsByDate.set(key, [meal]);
     }
 
     for (const exercise of exerciseLogs) {
-      const key = exercise.loggedAt.slice(0, 10);
+      const key = dateKeyFromDateTime(exercise.loggedAt);
       const current = exerciseByDate.get(key);
       if (current) current.push(exercise);
       else exerciseByDate.set(key, [exercise]);
     }
 
-    const keys = new Set<string>();
+    const keys = new Set<string>(range === "all" ? [] : rangeKeys);
     for (const key of summaryByDate.keys()) {
       if (isInDateWindow(key, dateWindow)) keys.add(key);
     }
-    for (const meal of meals) keys.add(meal.loggedAt.slice(0, 10));
-    for (const exercise of exerciseLogs) keys.add(exercise.loggedAt.slice(0, 10));
+    for (const meal of meals) keys.add(dateKeyFromDateTime(meal.loggedAt));
+    for (const exercise of exerciseLogs) keys.add(dateKeyFromDateTime(exercise.loggedAt));
     for (const key of [...keys]) {
       if (!isInDateWindow(key, dateWindow)) keys.delete(key);
     }
 
     if (keys.size === 0) {
-      for (const key of fallbackDateKeys(dateWindow, range)) keys.add(key);
+      for (const key of rangeKeys) keys.add(key);
     }
 
     return [...keys].sort().map((key) => {
@@ -105,25 +97,25 @@ export default function StatsPage() {
       return {
         date: key,
         label: d.toLocaleDateString(undefined, { month: "short", day: "numeric" }),
-        goal_deficit: Math.round(summary?.deficit_kcal ?? day.goal_deficit),
+        calorie_goal: Math.round(profile.calorie_goal),
         real_deficit: Math.round(summary?.real_deficit_kcal ?? day.real_deficit),
         kcal_in: Math.round(summary?.kcal_in ?? day.kcal_in),
+        kcal_burned: Math.round(summary?.kcal_out_activity ?? day.kcal_out_activity),
       };
     });
-  }, [dailySummaries, dateWindow, exerciseLogs, meals, profile, range]);
+  }, [dailySummaries, dateWindow, exerciseLogs, meals, profile, range, rangeKeys]);
 
   const waterGoalMl = recommendedWaterMl(profile.current_weight_kg);
   const sleepGoalHours = recommendedSleepHours(profile);
-  const goal = normalizeGoal(profile);
   const wellnessData = useMemo(() => {
     const summaryByDate = new Map(dailySummaries.map((summary) => [summary.date, summary]));
-    const keys = new Set<string>();
+    const keys = new Set<string>(range === "all" ? [] : rangeKeys);
     for (const key of summaryByDate.keys()) {
       if (isInDateWindow(key, dateWindow)) keys.add(key);
     }
 
     if (keys.size === 0) {
-      for (const key of fallbackDateKeys(dateWindow, range)) keys.add(key);
+      for (const key of rangeKeys) keys.add(key);
     }
 
     const days: {
@@ -149,11 +141,15 @@ export default function StatsPage() {
     }
 
     return days;
-  }, [dailySummaries, dateWindow, range, sleepGoalHours, waterGoalMl]);
+  }, [dailySummaries, dateWindow, range, rangeKeys, sleepGoalHours, waterGoalMl]);
 
-  const weightChange = weightData.length > 1
-    ? +(weightData[weightData.length - 1].weight - weightData[0].weight).toFixed(1)
+  const loggedWeightData = weightData.filter((point) => typeof point.weight === "number");
+  const weightChange = loggedWeightData.length > 1
+    ? +(loggedWeightData[loggedWeightData.length - 1].weight! - loggedWeightData[0].weight!).toFixed(1)
     : 0;
+  const weeklyPace = getWeeklyPace(goal);
+  const latestWeightPoint = [...loggedWeightData].reverse()[0];
+  const paceMessage = getPaceMessage(goal, weeklyPace, latestWeightPoint);
 
   return (
     <div className="space-y-5">
@@ -183,9 +179,10 @@ export default function StatsPage() {
         <CardContent className="py-2">
           <DeficitChart data={deficitData} />
           <div className="mt-3 flex flex-wrap gap-4 text-xs">
-            <Legend color="var(--rosso)" label="Goal deficit (bar)" />
+            <Legend color="var(--rosso)" label="Calories eaten (bar)" />
+            <Legend color="var(--aqua)" label="Workout burn (bar)" />
             <Legend color="var(--amber)" label="Real deficit (line)" />
-            <Legend color="var(--over)" label="kcal in (dotted)" />
+            <Legend color="var(--over)" label="Calorie goal (dotted)" />
           </div>
         </CardContent>
       </Card>
@@ -212,40 +209,34 @@ export default function StatsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="py-2">
-          <div className="mb-4 rounded-2xl border border-white/7 bg-black/25 p-3">
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-2">
-                <Target className="size-4 shrink-0 text-[var(--rosso-light)]" />
-                <div className="min-w-0">
-                  <p className="text-sm font-bold capitalize">
-                    {goal.mode} goal
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {goalMessage(goal.mode)}
-                  </p>
-                </div>
-              </div>
-              <p className="font-heading text-xl font-black text-[var(--rosso-light)]">
-                {Math.round(goal.progress)}%
-              </p>
-            </div>
-            <div className="h-2 overflow-hidden rounded-full bg-white/10">
-              <div
-                className="h-full rounded-full bg-[var(--rosso)] transition-all"
-                style={{ width: `${goal.progress}%` }}
-              />
-            </div>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Progress: {goal.currentDelta.toFixed(1)}kg of{" "}
-              {goal.targetDelta.toFixed(1)}kg target.{" "}
-              {goal.targetDate ? `Target date: ${goal.targetDate}.` : ""}
-            </p>
+          <div className="mb-4 grid grid-cols-3 gap-2">
+            <GoalStat
+              label="Progress"
+              value={`${Math.round(goal.progress)}%`}
+              accent
+            />
+            <GoalStat
+              label="This pace"
+              value={`${weeklyPace.requiredPerWeek.toFixed(1)}kg/wk`}
+            />
+            <GoalStat
+              label="Remaining"
+              value={`${Math.max(0, goal.targetDelta - goal.currentDelta).toFixed(1)}kg`}
+            />
           </div>
-          {weightData.length === 0 ? (
+          {loggedWeightData.length === 0 ? (
             <EmptyChart text="Log a check-in to see your trend" />
           ) : (
             <WeightTrendChart data={weightData} />
           )}
+          <div className="mt-3 rounded-2xl border border-white/7 bg-black/25 p-3">
+            <div className="mb-1 flex items-center gap-2">
+              <Target className="size-4 text-[var(--rosso-light)]" />
+              <p className="text-sm font-bold capitalize">{goal.mode} goal</p>
+            </div>
+            <p className="text-xs text-muted-foreground">{goalMessage(goal.mode)}</p>
+            <p className="mt-2 text-xs text-muted-foreground">{paceMessage}</p>
+          </div>
         </CardContent>
       </Card>
 
@@ -347,14 +338,120 @@ function getDateWindow(range: StatsRange) {
     const day = start.getDay();
     const diffToMonday = (day + 6) % 7;
     start.setDate(start.getDate() - diffToMonday);
+    end.setTime(start.getTime());
+    end.setDate(start.getDate() + 6);
   } else if (range === "month") {
     start.setDate(1);
+    end.setMonth(start.getMonth() + 1, 0);
   } else {
     start.setMonth(0, 1);
+    end.setMonth(11, 31);
   }
 
   start.setHours(0, 0, 0, 0);
   return { start: dateKey(start), end: dateKey(end) };
+}
+
+function mondayOf(date: Date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const day = d.getDay();
+  d.setDate(d.getDate() - ((day + 6) % 7));
+  return d;
+}
+
+function buildWeeklyWeightData(
+  weightLogs: { weight_kg: number; loggedAt: string }[],
+  goal: ReturnType<typeof normalizeGoal>,
+  window: { start: string | null; end: string | null },
+  range: StatsRange,
+) {
+  const logsByWeek = new Map<string, { weight_kg: number; loggedAt: string }>();
+  for (const log of [...weightLogs].sort(
+    (a, b) => +new Date(a.loggedAt) - +new Date(b.loggedAt),
+  )) {
+    const key = dateKey(mondayOf(new Date(log.loggedAt)));
+    if (!isInDateWindow(key, window) && range !== "all") continue;
+    logsByWeek.set(key, log);
+  }
+
+  const weekKeys =
+    range === "all"
+      ? [...logsByWeek.keys()].sort()
+      : fallbackDateKeys(window, range)
+          .filter((key) => dateKey(mondayOf(new Date(`${key}T12:00:00`))) === key)
+          .sort();
+
+  if (weekKeys.length === 0 && logsByWeek.size > 0) {
+    weekKeys.push(...[...logsByWeek.keys()].sort());
+  }
+
+  return weekKeys.map((weekKey) => {
+    const weekStart = new Date(`${weekKey}T12:00:00`);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    const log = logsByWeek.get(weekKey);
+    return {
+      date: `${weekStart.toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+      })}-${weekEnd.toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+      })}`,
+      weight: log?.weight_kg,
+      target_weight: targetWeightForDate(goal, weekEnd),
+    };
+  });
+}
+
+function targetWeightForDate(goal: ReturnType<typeof normalizeGoal>, at: Date) {
+  if (!goal.targetDate) return goal.targetWeight;
+  const start = new Date(`${goal.startDate}T12:00:00`);
+  const end = new Date(`${goal.targetDate}T12:00:00`);
+  const total = Math.max(1, end.getTime() - start.getTime());
+  const elapsed = Math.max(0, Math.min(total, at.getTime() - start.getTime()));
+  const ratio = elapsed / total;
+  if (goal.mode === "lose") {
+    return +(goal.startWeight - goal.targetDelta * ratio).toFixed(1);
+  }
+  if (goal.mode === "gain") {
+    return +(goal.startWeight + goal.targetDelta * ratio).toFixed(1);
+  }
+  return +goal.targetWeight.toFixed(1);
+}
+
+function getWeeklyPace(goal: ReturnType<typeof normalizeGoal>) {
+  if (!goal.targetDate) return { requiredPerWeek: 0, remainingPerWeek: 0 };
+  const start = new Date(`${goal.startDate}T12:00:00`);
+  const target = new Date(`${goal.targetDate}T12:00:00`);
+  const now = new Date();
+  const totalWeeks = Math.max(1, (target.getTime() - start.getTime()) / 604_800_000);
+  const remainingWeeks = Math.max(1, (target.getTime() - now.getTime()) / 604_800_000);
+  const remainingDelta = Math.max(0, goal.targetDelta - goal.currentDelta);
+  return {
+    requiredPerWeek: goal.targetDelta / totalWeeks,
+    remainingPerWeek: remainingDelta / remainingWeeks,
+  };
+}
+
+function getPaceMessage(
+  goal: ReturnType<typeof normalizeGoal>,
+  pace: { requiredPerWeek: number; remainingPerWeek: number },
+  latest?: { weight?: number; target_weight?: number },
+) {
+  if (!goal.targetDate || !latest?.weight || !latest.target_weight) {
+    return "Add weekly check-ins to compare actual progress against target pace.";
+  }
+  const onPace =
+    goal.mode === "lose"
+      ? latest.weight <= latest.target_weight
+      : goal.mode === "gain"
+        ? latest.weight >= latest.target_weight
+        : Math.abs(latest.weight - latest.target_weight) <= 0.5;
+  if (onPace) return "You are on pace for this week.";
+  if (goal.mode === "maintain") return "You are drifting from maintenance; tighten this week.";
+  return `Behind pace. New pace needed: ${pace.remainingPerWeek.toFixed(1)}kg/week.`;
 }
 
 function isInDateWindow(key: string, window: { start: string | null; end: string | null }) {
@@ -479,6 +576,32 @@ function RecommendationCard({
       </div>
       <p className="font-heading text-lg font-bold">{value}</p>
       {text && <p className="mt-1 text-xs text-muted-foreground">{text}</p>}
+    </div>
+  );
+}
+
+function GoalStat({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: string;
+  accent?: boolean;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/7 bg-black/25 p-3">
+      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      <p
+        className={
+          "mt-1 font-heading text-lg font-black " +
+          (accent ? "text-[var(--rosso-light)]" : "text-foreground")
+        }
+      >
+        {value}
+      </p>
     </div>
   );
 }

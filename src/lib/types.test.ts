@@ -5,8 +5,10 @@ import {
   adlKcal,
   activityKcal,
   computeDay,
+  dateKey,
   ringState,
   ageFromBirthdate,
+  sameDay,
   type Profile,
   type Meal,
   type ExerciseLog,
@@ -33,6 +35,17 @@ describe("ageFromBirthdate", () => {
   });
   it("handles birthday not yet passed", () => {
     expect(ageFromBirthdate("1995-12-15", new Date("2025-07-14"))).toBe(29);
+  });
+});
+
+describe("date helpers", () => {
+  it("keeps local calendar dates instead of UTC-shifting them", () => {
+    expect(dateKey(new Date(2026, 6, 16, 22, 30))).toBe("2026-07-16");
+  });
+
+  it("compares date-only keys and timestamp strings by calendar day", () => {
+    expect(sameDay("2026-07-16", "2026-07-16T12:00:00.000Z")).toBe(true);
+    expect(sameDay("2026-07-16", "2026-07-17T12:00:00.000Z")).toBe(false);
   });
 });
 

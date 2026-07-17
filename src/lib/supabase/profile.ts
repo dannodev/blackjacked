@@ -1,6 +1,7 @@
 "use client";
 
 import { getSupabaseBrowser, isSupabaseConfigured } from "@/lib/supabase/client";
+import { dateKeyFromDateTime } from "@/lib/types";
 import type { ActivityFactor, GoalMode, MealSchedule, Profile, Sex } from "@/lib/types";
 
 type ProfileRow = {
@@ -100,7 +101,7 @@ function toRow(userId: string, profile: Profile): Omit<ProfileRow, "created_at">
     goal_mode: profile.goal_mode ?? "lose",
     goal_start_weight_kg: profile.goal_start_weight_kg ?? profile.current_weight_kg,
     goal_target_weight_kg: profile.goal_target_weight_kg ?? null,
-    goal_start_date: profile.goal_start_date ?? profile.createdAt.slice(0, 10),
+    goal_start_date: profile.goal_start_date ?? dateKeyFromDateTime(profile.createdAt),
     goal_target_date: profile.goal_target_date ?? null,
     avatar_url: profile.avatar_url ?? null,
     avatar_public_id: profile.avatar_public_id ?? null,

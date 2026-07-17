@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { useStore } from "./store";
-import { dateKey } from "./types";
+import { dateKey, dateKeyFromDateTime } from "./types";
 
 export function useTodayData(date = new Date()) {
   const key = dateKey(date);
@@ -10,11 +10,11 @@ export function useTodayData(date = new Date()) {
   const allExerciseLogs = useStore((s) => s.exerciseLogs);
 
   const meals = useMemo(
-    () => allMeals.filter((m) => m.loggedAt.slice(0, 10) === key),
+    () => allMeals.filter((m) => dateKeyFromDateTime(m.loggedAt) === key),
     [allMeals, key],
   );
   const exerciseLogs = useMemo(
-    () => allExerciseLogs.filter((e) => e.loggedAt.slice(0, 10) === key),
+    () => allExerciseLogs.filter((e) => dateKeyFromDateTime(e.loggedAt) === key),
     [allExerciseLogs, key],
   );
 

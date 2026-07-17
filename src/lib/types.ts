@@ -81,7 +81,7 @@ export function normalizeGoal(profile: Profile) {
     targetDelta,
     currentDelta,
     progress,
-    startDate: profile.goal_start_date ?? profile.createdAt.slice(0, 10),
+    startDate: profile.goal_start_date ?? dateKeyFromDateTime(profile.createdAt),
     targetDate: profile.goal_target_date ?? null,
   };
 }
@@ -129,6 +129,7 @@ export interface Exercise {
   mets: number;
   distance_based?: boolean;
   fixed_kcal_per_25_min?: number;
+  timed_only?: boolean;
 }
 
 export interface ExerciseLog {
@@ -286,12 +287,22 @@ export function ringState(remaining: number, goal: number) {
 }
 
 export const todayKey = (at = new Date()): string =>
-  at.toISOString().slice(0, 10);
+  dateKey(at);
 
-export const dateKey = (d: Date): string => d.toISOString().slice(0, 10);
+export const dateKey = (d: Date): string => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+export const dateKeyFromDateTime = (value: string): string =>
+  dateKey(new Date(value));
 
 export function sameDay(a: string, b: string): boolean {
-  return a.slice(0, 10) === b.slice(0, 10);
+  const aKey = a.length > 10 ? dateKeyFromDateTime(a) : a;
+  const bKey = b.length > 10 ? dateKeyFromDateTime(b) : b;
+  return aKey === bKey;
 }
 
 export const MEAL_LABELS: Record<MealType, string> = {

@@ -59,17 +59,23 @@ export function ExerciseLogForm() {
   const kcal = selected
     ? exerciseKcal(selected, profile.current_weight_kg, duration)
     : 0;
+  const isTimedOnly = Boolean(selected?.timed_only || selected?.fixed_kcal_per_25_min);
   const favoriteExercises = favoriteExerciseIds
     .map((id) => EXERCISES.find((exercise) => exercise.id === id))
     .filter((exercise): exercise is Exercise => Boolean(exercise));
+
+  function chooseExercise(exercise: Exercise) {
+    setSelected(exercise);
+    setDuration(exercise.fixed_kcal_per_25_min ? 25 : 30);
+  }
 
   async function log() {
     if (!selected) {
       toast.error("Pick an exercise");
       return;
     }
-    if (duration <= 0 && !(sets > 0)) {
-      toast.error("Enter duration or sets");
+    if (duration <= 0) {
+      toast.error("Enter duration");
       return;
     }
     const log: ExerciseLog = {
@@ -80,8 +86,8 @@ export function ExerciseLogForm() {
       mets: selected.mets,
       duration_min: duration,
       distance_km: selected.distance_based ? distance || undefined : undefined,
-      reps: selected.category === "gym" || selected.category === "core" || selected.category === "calisthenics" ? reps : undefined,
-      sets: selected.category === "gym" || selected.category === "core" || selected.category === "calisthenics" ? sets : undefined,
+      reps: !isTimedOnly && (selected.category === "gym" || selected.category === "core" || selected.category === "calisthenics") ? reps : undefined,
+      sets: !isTimedOnly && (selected.category === "gym" || selected.category === "core" || selected.category === "calisthenics") ? sets : undefined,
       kcal_burned: kcal,
       loggedAt: new Date().toISOString(),
     };
@@ -107,7 +113,7 @@ export function ExerciseLogForm() {
         const ex = EXERCISES.find((e) => e.id === best.exercise_id) ||
           EXERCISES.find((e) => e.name.toLowerCase() === best.name.toLowerCase());
         if (ex) {
-          setSelected(ex);
+          chooseExercise(ex);
           setCat(ex.category);
           toast.success(`Matched: ${ex.name}`, {
             description: `${(best.confidence * 100).toFixed(0)}% confidence`,
@@ -138,14 +144,18 @@ export function ExerciseLogForm() {
               <button
                 key={exercise.id}
                 type="button"
-                onClick={() => setSelected(exercise)}
+                onClick={() => chooseExercise(exercise)}
                 className="flex w-36 shrink-0 flex-col gap-1 rounded-[1.25rem] border border-[var(--amber)]/25 bg-[var(--amber)]/10 p-3 text-left transition-colors hover:bg-[var(--amber)]/15"
               >
                 <span className="text-[11px] font-semibold text-[var(--amber)]">
                   {CATEGORY_LABELS[exercise.category]}
                 </span>
                 <span className="text-sm font-bold leading-tight">{exercise.name}</span>
-                <span className="text-[10px] text-muted-foreground">{exercise.mets} MET</span>
+                <span className="text-[10px] text-muted-foreground">
+                  {exercise.fixed_kcal_per_25_min
+                    ? "25 min · 350 kcal"
+                    : `${exercise.mets} MET`}
+                </span>
               </button>
             ))}
           </div>
@@ -218,7 +228,7 @@ export function ExerciseLogForm() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {(selected.category === "gym" || selected.category === "core" || selected.category === "calisthenics") && (
+              {!isTimedOnly && (selected.category === "gym" || selected.category === "core" || selected.category === "calisthenics") && (
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Sets">
                     <Input
@@ -287,7 +297,7 @@ export function ExerciseLogForm() {
             >
               <button
                 type="button"
-                onClick={() => setSelected(e)}
+                onClick={() => chooseExercise(e)}
                 className="min-w-0 flex-1 text-left"
               >
                 <p className="text-sm font-medium">{e.name}</p>
@@ -318,7 +328,7 @@ export function ExerciseLogForm() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setSelected(e)}
+                  onClick={() => chooseExercise(e)}
                   aria-label={`Select ${e.name}`}
                   className="flex size-8 items-center justify-center rounded-full text-[var(--rosso-light)]"
                 >

@@ -49,6 +49,7 @@ export const EXERCISES: Exercise[] = [
     category: "calisthenics",
     mets: 14,
     fixed_kcal_per_25_min: 350,
+    timed_only: true,
   },
   { id: "pushup", name: "Push-ups", category: "calisthenics", mets: 8.0 },
   { id: "dip", name: "Dips", category: "calisthenics", mets: 8.0 },
