@@ -6,7 +6,14 @@ import { useStore } from "@/lib/store";
 import { useTodayData } from "@/lib/use-today-data";
 import { useCloudMeals } from "@/lib/use-cloud-meals";
 import { useCloudExerciseLogs } from "@/lib/use-cloud-exercise-logs";
-import { computeDay, dateKey, exerciseKcal, type Exercise } from "@/lib/types";
+import {
+  computeDay,
+  dateKey,
+  exerciseKcal,
+  MEAL_LABELS,
+  type Exercise,
+  type Meal,
+} from "@/lib/types";
 import {
   getCurrentMealOptions,
   MENU_MEAL_PRESETS,
@@ -16,7 +23,18 @@ import { CATEGORY_LABELS, EXERCISES } from "@/lib/exercises-seed";
 import { makeId } from "@/lib/id";
 import { DeficitRing } from "@/components/deficit-ring";
 import { Card, CardContent } from "@/components/ui/card";
-import { Flame, Droplets, Moon, Users, Check, Star, Target, Dumbbell, Utensils } from "lucide-react";
+import {
+  Flame,
+  Droplets,
+  Moon,
+  Users,
+  Check,
+  Star,
+  Target,
+  Dumbbell,
+  Utensils,
+  Trash2,
+} from "lucide-react";
 import Link from "next/link";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { toast } from "sonner";
@@ -43,7 +61,7 @@ export default function DashboardPage() {
   const customMenuMeals = useStore((s) => s.customMenuMeals);
   const useDefaultMenu = useStore((s) => s.useDefaultMenu);
   const favoriteExerciseIds = useStore((s) => s.favoriteExerciseIds);
-  const { addMeal } = useCloudMeals();
+  const { addMeal, deleteMeal } = useCloudMeals();
   const { addExerciseLog } = useCloudExerciseLogs();
   const [selectedMenuMeal, setSelectedMenuMeal] = useState<MenuMealOption | null>(null);
   const [squadSnapshot, setSquadSnapshot] = useState<SquadSnapshot | null>(null);
@@ -349,6 +367,49 @@ export default function DashboardPage() {
         </DialogContent>
       </Dialog>
 
+      {/* logged meals */}
+      <div className="dashboard-item">
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="font-heading text-sm font-bold">Logged meals</h2>
+          <Link
+            href="/log"
+            className="text-xs font-semibold text-[var(--rosso-light)] hover:underline"
+          >
+            Add meal
+          </Link>
+        </div>
+        {meals.length === 0 ? (
+          <Card className="rounded-[1.35rem] border-dashed border-white/10 bg-white/[0.035]">
+            <CardContent className="flex items-center gap-3 py-4">
+              <div className="flex size-10 items-center justify-center rounded-2xl bg-[var(--rosso)]/12 text-[var(--rosso-light)]">
+                <Utensils className="size-5" />
+              </div>
+              <div>
+                <p className="text-sm font-bold">No meals logged yet</p>
+                <p className="text-xs text-muted-foreground">
+                  Tap a meal option above or use Log.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-2">
+            {[...meals]
+              .sort((a, b) => +new Date(b.loggedAt) - +new Date(a.loggedAt))
+              .map((meal) => (
+                <LoggedMealRow
+                  key={meal.id}
+                  meal={meal}
+                  onDelete={async () => {
+                    await deleteMeal(meal.id);
+                    toast.success("Meal removed");
+                  }}
+                />
+              ))}
+          </div>
+        )}
+      </div>
+
       {/* squad shortcut */}
       <div className="dashboard-item">
         <div className="mb-2 flex items-center justify-between">
@@ -603,6 +664,42 @@ function MacroBox({ label, value }: { label: string; value: string }) {
         {value}
       </p>
     </div>
+  );
+}
+
+function LoggedMealRow({
+  meal,
+  onDelete,
+}: {
+  meal: Meal;
+  onDelete: () => void | Promise<void>;
+}) {
+  const title = meal.items[0]?.name ?? MEAL_LABELS[meal.type];
+  return (
+    <Card className="rounded-[1.25rem] border-white/7 bg-white/[0.045]">
+      <CardContent className="flex items-center justify-between gap-3 py-3">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-bold">{title}</p>
+          <p className="text-xs text-muted-foreground">
+            {MEAL_LABELS[meal.type]} · P {Math.round(meal.p)} · C{" "}
+            {Math.round(meal.c)} · F {Math.round(meal.f)}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="font-heading text-sm font-bold text-[var(--rosso-light)]">
+            {Math.round(meal.total_kcal)}
+          </span>
+          <button
+            type="button"
+            aria-label={`Remove ${title}`}
+            className="flex size-8 items-center justify-center rounded-full border border-white/10 text-muted-foreground transition-colors hover:border-[var(--over)]/40 hover:text-[var(--over)]"
+            onClick={() => void onDelete()}
+          >
+            <Trash2 className="size-4" />
+          </button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

@@ -12,11 +12,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ACTIVITY_OPTIONS, dateKey, normalizeGoal, type MealSchedule } from "@/lib/types";
-import { Bolt, Bell, BellOff, Camera, Clock3, Target, Trash2, Users } from "lucide-react";
+import {
+  ACTIVITY_OPTIONS,
+  dateKey,
+  normalizeGoal,
+  type ActivityFactor,
+  type MealSchedule,
+  type Profile,
+  type Sex,
+} from "@/lib/types";
+import { Bolt, Bell, BellOff, Camera, Clock3, Target, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { memo, useEffect, useState } from "react";
 import { saveSupabaseProfile } from "@/lib/supabase/profile";
 
@@ -126,7 +133,11 @@ export default function ProfilePage() {
   const [remindersOn, setRemindersOn] = useState(false);
   const [savingTimes, setSavingTimes] = useState(false);
   const [savingGoal, setSavingGoal] = useState(false);
+  const [savingStats, setSavingStats] = useState(false);
   const [savingAvatar, setSavingAvatar] = useState(false);
+  const [editingSection, setEditingSection] = useState<
+    "stats" | "goal" | "meals" | null
+  >(null);
 
   useEffect(() => {
     const stored = localStorage.getItem("blackjacked.reminders");
@@ -159,9 +170,41 @@ export default function ProfilePage() {
     }
   }
 
-  const activity = ACTIVITY_OPTIONS.find(
-    (o) => o.value === profile.activity_factor,
-  );
+  async function saveStatsAndTargets(draft: StatsTargetsDraft) {
+    const nextProfile = {
+      ...profile,
+      sex: draft.sex,
+      height_cm: draft.height_cm,
+      current_weight_kg: draft.current_weight_kg,
+      activity_factor: draft.activity_factor,
+      calorie_goal: draft.calorie_goal,
+      protein_goal: draft.protein_goal,
+      carb_goal: draft.carb_goal,
+      fat_goal: draft.fat_goal,
+    };
+
+    try {
+      setSavingStats(true);
+      const saved = user
+        ? await saveSupabaseProfile(user.id, nextProfile)
+        : nextProfile;
+      updateProfile({
+        sex: saved.sex,
+        height_cm: saved.height_cm,
+        current_weight_kg: saved.current_weight_kg,
+        activity_factor: saved.activity_factor,
+        calorie_goal: saved.calorie_goal,
+        protein_goal: saved.protein_goal,
+        carb_goal: saved.carb_goal,
+        fat_goal: saved.fat_goal,
+      });
+      toast.success("Stats and targets saved");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not save stats");
+    } finally {
+      setSavingStats(false);
+    }
+  }
 
   async function saveMealTimes(meal_schedule: MealSchedule) {
     const nextProfile = { ...profile, meal_schedule };
@@ -320,45 +363,48 @@ export default function ProfilePage() {
         <Stat label="Best streak" value={`${streaks.longest_streak}`} />
       </div>
 
-      <Card className="carbon-card rounded-[1.5rem] border-white/7">
-        <CardHeader>
-          <CardTitle className="font-heading text-base">Your stats</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          <Row label="Sex" value={profile.sex} cap />
-          <Row label="Height" value={`${profile.height_cm} cm`} />
-          <Row label="Weight" value={`${profile.current_weight_kg} kg`} />
-          <Row label="Activity" value={activity?.label ?? "—"} />
-        </CardContent>
-      </Card>
+      {editingSection === "stats" ? (
+        <StatsTargetsEditor
+          profile={profile}
+          saving={savingStats}
+          onCancel={() => setEditingSection(null)}
+          onSave={saveStatsAndTargets}
+        />
+      ) : (
+        <StatsTargetsCard
+          profile={profile}
+          onEdit={() => setEditingSection("stats")}
+        />
+      )}
 
-      <Card className="premium-panel rounded-[1.5rem]">
-        <CardHeader>
-          <CardTitle className="font-heading text-base flex items-center gap-2">
-            <Bolt className="size-4 text-[var(--rosso-light)]" />
-            Daily targets
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          <Row label="Calorie goal" value={`${profile.calorie_goal} kcal`} big />
-          <Row label="Protein" value={`${profile.protein_goal} g`} />
-          <Row label="Carbs" value={`${profile.carb_goal} g`} />
-          <Row label="Fat" value={`${profile.fat_goal} g`} />
-        </CardContent>
-      </Card>
+      {editingSection === "goal" ? (
+        <GoalSettingsEditor
+          currentWeight={profile.current_weight_kg}
+          initialGoal={normalizeGoal(profile)}
+          saving={savingGoal}
+          onCancel={() => setEditingSection(null)}
+          onSave={saveGoal}
+        />
+      ) : (
+        <GoalSettingsCard
+          initialGoal={normalizeGoal(profile)}
+          onEdit={() => setEditingSection("goal")}
+        />
+      )}
 
-      <GoalSettingsCard
-        currentWeight={profile.current_weight_kg}
-        initialGoal={normalizeGoal(profile)}
-        saving={savingGoal}
-        onSave={saveGoal}
-      />
-
-      <MealTimesSettingsCard
-        initialSchedule={profile.meal_schedule}
-        saving={savingTimes}
-        onSave={saveMealTimes}
-      />
+      {editingSection === "meals" ? (
+        <MealTimesSettingsEditor
+          initialSchedule={profile.meal_schedule}
+          saving={savingTimes}
+          onCancel={() => setEditingSection(null)}
+          onSave={saveMealTimes}
+        />
+      ) : (
+        <MealTimesSettingsCard
+          initialSchedule={profile.meal_schedule}
+          onEdit={() => setEditingSection("meals")}
+        />
+      )}
 
       <div className="space-y-2">
         <button
@@ -385,22 +431,6 @@ export default function ProfilePage() {
             {remindersOn ? "On" : "Off"}
           </span>
         </button>
-        <Link href="/onboarding">
-          <Button variant="outline" className="w-full">
-            Edit profile & goals
-          </Button>
-        </Link>
-        <Link href="/checkin">
-          <Button variant="outline" className="w-full">
-            Weekly check-in
-          </Button>
-        </Link>
-        <Link href="/squad">
-          <Button variant="outline" className="w-full">
-            <Users className="mr-2 size-4" />
-            Your squad
-          </Button>
-        </Link>
         <Button
           variant="ghost"
           className="w-full text-[var(--over)]"
@@ -449,6 +479,243 @@ function MealTimeInput({
   );
 }
 
+type StatsTargetsDraft = {
+  sex: Sex;
+  height_cm: number;
+  current_weight_kg: number;
+  activity_factor: ActivityFactor;
+  calorie_goal: number;
+  protein_goal: number;
+  carb_goal: number;
+  fat_goal: number;
+};
+
+const StatsTargetsCard = memo(function StatsTargetsCard({
+  profile,
+  onEdit,
+}: {
+  profile: Profile;
+  onEdit: () => void;
+}) {
+  const activity = ACTIVITY_OPTIONS.find(
+    (option) => option.value === profile.activity_factor,
+  );
+  return (
+    <SummaryCard
+      icon={<Bolt className="size-4 text-[var(--rosso-light)]" />}
+      title="Stats & daily targets"
+      onEdit={onEdit}
+    >
+      <div className="grid grid-cols-2 gap-3 text-sm">
+        <SummaryItem label="Height" value={`${profile.height_cm} cm`} />
+        <SummaryItem label="Weight" value={`${profile.current_weight_kg} kg`} />
+        <SummaryItem label="Activity" value={activity?.label ?? "-"} />
+        <SummaryItem label="Calories" value={`${profile.calorie_goal} kcal`} />
+        <SummaryItem label="Protein" value={`${profile.protein_goal}g`} />
+        <SummaryItem label="Carbs / Fat" value={`${profile.carb_goal}g / ${profile.fat_goal}g`} />
+      </div>
+    </SummaryCard>
+  );
+});
+
+function StatsTargetsEditor({
+  profile,
+  saving,
+  onCancel,
+  onSave,
+}: {
+  profile: Profile;
+  saving: boolean;
+  onCancel: () => void;
+  onSave: (draft: StatsTargetsDraft) => void | Promise<void>;
+}) {
+  const [draft, setDraft] = useState<StatsTargetsDraft>(() => ({
+    sex: profile.sex,
+    height_cm: profile.height_cm,
+    current_weight_kg: profile.current_weight_kg,
+    activity_factor: profile.activity_factor,
+    calorie_goal: profile.calorie_goal,
+    protein_goal: profile.protein_goal,
+    carb_goal: profile.carb_goal,
+    fat_goal: profile.fat_goal,
+  }));
+
+  function updateNumber(key: keyof StatsTargetsDraft, value: string) {
+    setDraft((current) => ({
+      ...current,
+      [key]: value === "" ? 0 : +value,
+    }));
+  }
+
+  function save() {
+    if (draft.height_cm < 120 || draft.height_cm > 230) {
+      toast.error("Height should be between 120 and 230 cm.");
+      return;
+    }
+    if (draft.current_weight_kg < 35 || draft.current_weight_kg > 300) {
+      toast.error("Weight should be between 35 and 300 kg.");
+      return;
+    }
+    if (draft.calorie_goal < 800 || draft.calorie_goal > 6000) {
+      toast.error("Calories should be between 800 and 6000.");
+      return;
+    }
+    void onSave({
+      ...draft,
+      height_cm: Math.round(draft.height_cm),
+      current_weight_kg: +draft.current_weight_kg.toFixed(1),
+      calorie_goal: Math.round(draft.calorie_goal),
+      protein_goal: Math.max(0, Math.round(draft.protein_goal)),
+      carb_goal: Math.max(0, Math.round(draft.carb_goal)),
+      fat_goal: Math.max(0, Math.round(draft.fat_goal)),
+    });
+  }
+
+  return (
+    <Card className="profile-section premium-panel rounded-[1.5rem]">
+      <CardHeader>
+        <CardTitle className="font-heading text-base flex items-center gap-2">
+          <Bolt className="size-4 text-[var(--rosso-light)]" />
+          Stats & daily targets
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-2 gap-2">
+          {(["male", "female"] as const).map((sex) => (
+            <button
+              key={sex}
+              type="button"
+              onClick={() => setDraft((current) => ({ ...current, sex }))}
+              className={
+                "rounded-full border px-3 py-2 text-xs font-semibold capitalize transition-colors " +
+                (draft.sex === sex
+                  ? "border-[var(--rosso)] bg-[var(--rosso)]/12 text-[var(--rosso-light)]"
+                  : "border-white/10 text-muted-foreground")
+              }
+            >
+              {sex}
+            </button>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <ProfileNumberInput
+            id="profile-height"
+            label="Height (cm)"
+            value={draft.height_cm}
+            onChange={(value) => updateNumber("height_cm", value)}
+          />
+          <ProfileNumberInput
+            id="profile-weight"
+            label="Weight (kg)"
+            step="0.1"
+            value={draft.current_weight_kg}
+            onChange={(value) => updateNumber("current_weight_kg", value)}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="profile-activity" className="text-xs">
+            Activity level
+          </Label>
+          <select
+            id="profile-activity"
+            value={draft.activity_factor}
+            onChange={(event) =>
+              setDraft((current) => ({
+                ...current,
+                activity_factor: +event.target.value as ActivityFactor,
+              }))
+            }
+            className="h-11 w-full rounded-2xl border border-input bg-white/[0.045] px-3.5 text-base outline-none focus:border-[var(--rosso)]"
+          >
+            {ACTIVITY_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value} className="bg-[#111]">
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="space-y-2">
+          <ProfileNumberInput
+            id="profile-calories"
+            label="Calorie goal (kcal/day)"
+            step="10"
+            value={draft.calorie_goal}
+            onChange={(value) => updateNumber("calorie_goal", value)}
+          />
+        </div>
+
+        <div className="grid grid-cols-3 gap-2">
+          <ProfileNumberInput
+            id="profile-protein"
+            label="Protein"
+            value={draft.protein_goal}
+            onChange={(value) => updateNumber("protein_goal", value)}
+          />
+          <ProfileNumberInput
+            id="profile-carbs"
+            label="Carbs"
+            value={draft.carb_goal}
+            onChange={(value) => updateNumber("carb_goal", value)}
+          />
+          <ProfileNumberInput
+            id="profile-fat"
+            label="Fat"
+            value={draft.fat_goal}
+            onChange={(value) => updateNumber("fat_goal", value)}
+          />
+        </div>
+
+        <p className="text-xs text-muted-foreground">
+          Use this if your first height, weight, or daily targets were just an estimate.
+          Your squad still cannot see height or weight.
+        </p>
+        <Button
+          className="w-full bg-[var(--rosso)] font-semibold text-white hover:bg-[var(--rosso)]/90"
+          onClick={save}
+          disabled={saving}
+        >
+          {saving ? "Saving..." : "Save stats & targets"}
+        </Button>
+        <Button variant="ghost" className="w-full" onClick={onCancel} disabled={saving}>
+          Cancel
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ProfileNumberInput({
+  id,
+  label,
+  value,
+  step = "1",
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: number;
+  step?: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id} className="text-xs">
+        {label}
+      </Label>
+      <Input
+        id={id}
+        type="number"
+        step={step}
+        value={value || ""}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </div>
+  );
+}
+
 type GoalDraft = {
   goal_mode: "lose" | "gain" | "maintain";
   goal_target_weight_kg?: number;
@@ -456,14 +723,48 @@ type GoalDraft = {
 };
 
 const GoalSettingsCard = memo(function GoalSettingsCard({
+  initialGoal,
+  onEdit,
+}: {
+  initialGoal: ReturnType<typeof normalizeGoal>;
+  onEdit: () => void;
+}) {
+  return (
+    <SummaryCard
+      icon={<Target className="size-4 text-[var(--rosso-light)]" />}
+      title="Long-term goal"
+      onEdit={onEdit}
+    >
+      <div className="grid grid-cols-2 gap-3 text-sm">
+        <SummaryItem label="Mode" value={initialGoal.mode} cap />
+        <SummaryItem
+          label="Progress"
+          value={`${Math.round(initialGoal.progress)}%`}
+        />
+        <SummaryItem
+          label="Target"
+          value={`${initialGoal.targetWeight.toFixed(1)} kg`}
+        />
+        <SummaryItem label="Date" value={initialGoal.targetDate ?? "Later"} />
+      </div>
+      <p className="mt-3 text-xs text-muted-foreground">
+        Squad sees goal type and progress, never your height or weight.
+      </p>
+    </SummaryCard>
+  );
+});
+
+function GoalSettingsEditor({
   currentWeight,
   initialGoal,
   saving,
+  onCancel,
   onSave,
 }: {
   currentWeight: number;
   initialGoal: ReturnType<typeof normalizeGoal>;
   saving: boolean;
+  onCancel: () => void;
   onSave: (draft: GoalDraft) => void | Promise<void>;
 }) {
   const [goalDraft, setGoalDraft] = useState<GoalDraft>(() => ({
@@ -473,7 +774,7 @@ const GoalSettingsCard = memo(function GoalSettingsCard({
   }));
 
   return (
-    <Card className="carbon-card rounded-[1.5rem] border-white/7">
+    <Card className="profile-section carbon-card rounded-[1.5rem] border-white/7">
       <CardHeader>
         <CardTitle className="font-heading text-base flex items-center gap-2">
           <Target className="size-4 text-[var(--rosso-light)]" />
@@ -556,18 +857,48 @@ const GoalSettingsCard = memo(function GoalSettingsCard({
         >
           {saving ? "Saving..." : "Save goal"}
         </Button>
+        <Button variant="ghost" className="w-full" onClick={onCancel} disabled={saving}>
+          Cancel
+        </Button>
       </CardContent>
     </Card>
   );
-});
+}
 
 const MealTimesSettingsCard = memo(function MealTimesSettingsCard({
   initialSchedule,
+  onEdit,
+}: {
+  initialSchedule?: MealSchedule;
+  onEdit: () => void;
+}) {
+  const schedule = normalizeSchedule(initialSchedule);
+  return (
+    <SummaryCard
+      icon={<Clock3 className="size-4 text-[var(--rosso-light)]" />}
+      title="Meal times"
+      onEdit={onEdit}
+    >
+      <div className="grid grid-cols-2 gap-3 text-sm">
+        <SummaryItem label="Breakfast" value={formatTime(schedule.breakfast_time)} />
+        <SummaryItem label="AM snack" value={formatTime(schedule.am_snack_time)} />
+        <SummaryItem label="Lunch" value={formatTime(schedule.lunch_time)} />
+        <SummaryItem label="PM snack" value={formatTime(schedule.pm_snack_time)} />
+        <SummaryItem label="Dinner" value={formatTime(schedule.dinner_time)} />
+      </div>
+    </SummaryCard>
+  );
+});
+
+function MealTimesSettingsEditor({
+  initialSchedule,
   saving,
+  onCancel,
   onSave,
 }: {
   initialSchedule?: MealSchedule;
   saving: boolean;
+  onCancel: () => void;
   onSave: (schedule: MealSchedule) => void | Promise<void>;
 }) {
   const [mealTimes, setMealTimes] = useState(() =>
@@ -585,7 +916,7 @@ const MealTimesSettingsCard = memo(function MealTimesSettingsCard({
   }
 
   return (
-    <Card className="carbon-card rounded-[1.5rem] border-white/7">
+    <Card className="profile-section carbon-card rounded-[1.5rem] border-white/7">
       <CardHeader>
         <CardTitle className="font-heading text-base flex items-center gap-2">
           <Clock3 className="size-4 text-[var(--rosso-light)]" />
@@ -646,10 +977,69 @@ const MealTimesSettingsCard = memo(function MealTimesSettingsCard({
         >
           {saving ? "Saving..." : "Save meal times"}
         </Button>
+        <Button variant="ghost" className="w-full" onClick={onCancel} disabled={saving}>
+          Cancel
+        </Button>
       </CardContent>
     </Card>
   );
-});
+}
+
+function SummaryCard({
+  icon,
+  title,
+  children,
+  onEdit,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  children: React.ReactNode;
+  onEdit: () => void;
+}) {
+  return (
+    <Card className="profile-section carbon-card rounded-[1.5rem] border-white/7">
+      <CardHeader>
+        <div className="flex items-center justify-between gap-3">
+          <CardTitle className="font-heading text-base flex items-center gap-2">
+            {icon}
+            {title}
+          </CardTitle>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-8 px-3 text-xs"
+            onClick={onEdit}
+          >
+            Edit
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
+  );
+}
+
+function SummaryItem({
+  label,
+  value,
+  cap,
+}: {
+  label: string;
+  value: string;
+  cap?: boolean;
+}) {
+  return (
+    <div>
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className={"font-semibold " + (cap ? "capitalize" : "")}>{value}</p>
+    </div>
+  );
+}
+
+function formatTime(value?: string | null) {
+  if (!value) return "Later";
+  return value;
+}
 
 function Stat({
   label,
@@ -676,31 +1066,5 @@ function Stat({
         </p>
       </CardContent>
     </Card>
-  );
-}
-
-function Row({
-  label,
-  value,
-  big,
-  cap,
-}: {
-  label: string;
-  value: string;
-  big?: boolean;
-  cap?: boolean;
-}) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="text-muted-foreground">{label}</span>
-      <span
-        className={
-          (big ? "font-heading font-bold text-foreground " : "") +
-          (cap ? "capitalize" : "")
-        }
-      >
-        {value}
-      </span>
-    </div>
   );
 }

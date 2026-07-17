@@ -230,6 +230,11 @@
   text-wrap: balance;
 }
 
+.profile-section {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 340px;
+}
+
 @keyframes brand-splash-pop {
   from {
     opacity: 0;
