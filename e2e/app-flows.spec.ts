@@ -157,4 +157,11 @@ test("squad join flow accepts an invite code and shows squad activity", async ({
   await expect(page.getByRole("heading", { name: "Test Squad" })).toBeVisible();
   await expect(page.getByText("BLACK1")).toBeVisible();
   await expect(page.getByText("No height or weight is shared.")).toBeVisible();
+  await expect(page.getByText("Blackjack leaderboard")).toHaveCount(0);
+  await expect(page.getByText("Enter table")).toHaveCount(0);
+
+  await page.getByPlaceholder("Talk your trash...").fill("Realtime smoke message");
+  await page.getByRole("button", { name: "Send squad message" }).click();
+
+  await expect(page.getByText("Realtime smoke message")).toBeVisible();
 });

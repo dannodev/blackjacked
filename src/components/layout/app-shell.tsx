@@ -110,26 +110,55 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
+    const idleWindow = window as Window & {
+      requestIdleCallback?: (
+        callback: () => void,
+        options?: { timeout: number },
+      ) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
 
-    loadMySquad()
-      .then((snapshot) => {
-        if (cancelled) return;
-        setSquadSnapshot(snapshot);
-        initializedSquadRef.current = true;
-      })
-      .catch(() => {
-        initializedSquadRef.current = true;
-      });
+    if (!user?.id) {
+      setSquadSnapshot(null);
+      initializedSquadRef.current = true;
+      return;
+    }
+
+    if (pathname.startsWith("/squad")) {
+      initializedSquadRef.current = true;
+      return;
+    }
+
+    const load = () => {
+      loadMySquad()
+        .then((snapshot) => {
+          if (cancelled) return;
+          setSquadSnapshot(snapshot);
+          initializedSquadRef.current = true;
+        })
+        .catch(() => {
+          initializedSquadRef.current = true;
+        });
+    };
+
+    const handle = idleWindow.requestIdleCallback
+      ? idleWindow.requestIdleCallback(load, { timeout: 1200 })
+      : window.setTimeout(load, 250);
 
     return () => {
       cancelled = true;
+      if (idleWindow.cancelIdleCallback) idleWindow.cancelIdleCallback(handle);
+      else window.clearTimeout(handle);
     };
-  }, [user?.id]);
+  }, [pathname, user?.id]);
 
   useEffect(() => {
-    if (!squadSnapshot?.squad.id || !user?.id) return;
+    if (!squadSnapshot?.squad.id || !user?.id || pathname.startsWith("/squad")) {
+      return;
+    }
 
     const unsubscribe = subscribeToSquad(squadSnapshot.squad.id, (event) => {
+      let shouldReloadSnapshot = false;
       if (
         event?.table === "squad_messages" &&
         event.eventType === "INSERT" &&
@@ -149,7 +178,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         });
       }
 
-      scheduleSquadSnapshotReload();
+      if (
+        event?.table === "squads" ||
+        (event?.table === "squad_members" &&
+          ["INSERT", "DELETE"].includes(event.eventType))
+      ) {
+        shouldReloadSnapshot = true;
+      }
+
+      if (shouldReloadSnapshot) scheduleSquadSnapshotReload();
     });
     return () => {
       if (squadRefreshTimerRef.current) {
@@ -158,10 +195,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       }
       unsubscribe();
     };
-  }, [language, scheduleSquadSnapshotReload, squadSnapshot?.squad.id, user?.id]);
+  }, [language, pathname, scheduleSquadSnapshotReload, squadSnapshot?.squad.id, user?.id]);
 
   useEffect(() => {
-    if (!squadSnapshot?.squad.id) return;
+    if (!squadSnapshot?.squad.id || pathname.startsWith("/squad")) return;
 
     const touch = () => {
       if (document.visibilityState === "visible") {
@@ -177,12 +214,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       window.clearInterval(interval);
       document.removeEventListener("visibilitychange", touch);
     };
-  }, [squadSnapshot?.squad.id]);
+  }, [pathname, squadSnapshot?.squad.id]);
 
   return (
     <div className="app-glow mx-auto flex min-h-[100dvh] max-w-md flex-col overflow-hidden bg-background pt-[env(safe-area-inset-top)] shadow-[0_0_80px_rgba(0,0,0,0.55)] sm:border-x sm:border-white/8">
       {/* Sticky app bar */}
-      <header className="sticky top-0 z-40 flex items-center justify-between border-b border-white/5 bg-background/72 px-4 py-3 backdrop-blur-2xl">
+      <header className="sticky top-0 z-40 flex items-center justify-between border-b border-white/5 bg-background/94 px-4 py-3 md:bg-background/72 md:backdrop-blur-2xl">
         <Link href="/dashboard" className="flex items-center">
           <Wordmark size="text-lg" />
         </Link>
@@ -301,7 +338,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Bottom nav */}
       <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto max-w-md px-3 pb-3">
-        <ul className="flex items-stretch justify-around rounded-[1.6rem] border border-white/8 bg-black/72 px-1 pb-[env(safe-area-inset-bottom)] shadow-[0_18px_50px_rgba(0,0,0,0.5)] backdrop-blur-2xl">
+        <ul className="flex items-stretch justify-around rounded-[1.6rem] border border-white/8 bg-black/94 px-1 pb-[env(safe-area-inset-bottom)] shadow-[0_18px_50px_rgba(0,0,0,0.5)] md:bg-black/72 md:backdrop-blur-2xl">
           {nav.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(`${href}/`);
             return (

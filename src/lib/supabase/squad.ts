@@ -1,7 +1,7 @@
 "use client";
 
 import { getSupabaseBrowser, isSupabaseConfigured } from "@/lib/supabase/client";
-import type { Streaks } from "@/lib/types";
+import { dateKey, type Streaks } from "@/lib/types";
 
 const SQUAD_COLORS = [
   "#dc0000",
@@ -14,6 +14,8 @@ const SQUAD_COLORS = [
 const E2E_AUTH_KEY = "blackjacked.e2eAuth";
 const E2E_SQUAD_KEY = "blackjacked.e2eSquad";
 const E2E_USER_ID = "00000000-0000-4000-8000-000000000001";
+const RECENT_SQUAD_ACTIVITY_DAYS = 35;
+const cleanedMessageSquads = new Set<string>();
 
 export type SquadRow = {
   id: string;
@@ -195,6 +197,12 @@ function generateInviteCode() {
   return Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join("");
 }
 
+function recentActivityStartDate() {
+  const start = new Date();
+  start.setDate(start.getDate() - RECENT_SQUAD_ACTIVITY_DAYS);
+  return dateKey(start);
+}
+
 async function loadSquadById(squadId: string): Promise<SquadSnapshot> {
   const supabase = requireSupabase();
   await deleteExpiredSquadMessages(squadId);
@@ -207,7 +215,13 @@ async function loadSquadById(squadId: string): Promise<SquadSnapshot> {
         .select("*")
         .eq("squad_id", squadId)
         .order("joined_at", { ascending: true }),
-      supabase.from("squad_activity").select("*").eq("squad_id", squadId),
+      supabase
+        .from("squad_activity")
+        .select("*")
+        .eq("squad_id", squadId)
+        .gte("date", recentActivityStartDate())
+        .order("date", { ascending: false })
+        .limit(200),
       supabase
         .from("squad_messages")
         .select("*")
@@ -466,27 +480,33 @@ export async function syncMySquadActivity(
 export async function sendSquadMessage(squadId: string, body: string) {
   if (canUseE2EAuthBypass()) {
     const snapshot = getE2eSquad();
-    if (!snapshot) return;
-    snapshot.messages.push({
+    if (!snapshot) return null;
+    const message = {
       id: randomId(),
       squad_id: squadId,
       user_id: E2E_USER_ID,
       body,
       created_at: new Date().toISOString(),
-    });
+    };
+    snapshot.messages.push(message);
     setE2eSquad(snapshot);
-    return;
+    return message;
   }
 
   const supabase = requireSupabase();
   const userId = await getCurrentUserId();
-  const { error } = await supabase.from("squad_messages").insert({
-    squad_id: squadId,
-    user_id: userId,
-    body,
-  });
+  const { data, error } = await supabase
+    .from("squad_messages")
+    .insert({
+      squad_id: squadId,
+      user_id: userId,
+      body,
+    })
+    .select("id, squad_id, user_id, body, created_at")
+    .single();
 
   if (error) throw error;
+  return data as SquadMessageRow;
 }
 
 export async function deleteExpiredSquadMessages(squadId: string) {
@@ -501,6 +521,8 @@ export async function deleteExpiredSquadMessages(squadId: string) {
     return;
   }
 
+  if (cleanedMessageSquads.has(squadId)) return;
+
   const supabase = requireSupabase();
   const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const { error } = await supabase
@@ -510,6 +532,7 @@ export async function deleteExpiredSquadMessages(squadId: string) {
     .lt("created_at", cutoff);
 
   if (error) throw error;
+  cleanedMessageSquads.add(squadId);
 }
 
 export function subscribeToSquad(

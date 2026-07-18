@@ -8,7 +8,6 @@ import {
   Crown,
   Dumbbell,
   Flame,
-  Gamepad2,
   Loader2,
   LogOut,
   MessageCircle,
@@ -17,7 +16,6 @@ import {
   Send,
   ShieldCheck,
   Target,
-  Trophy,
   Utensils,
   Users,
 } from "lucide-react";
@@ -33,10 +31,12 @@ import {
   sendSquadMessage,
   subscribeToSquad,
   syncMySquadActivity,
+  touchMySquadPresence,
   updateRemoteSquadName,
   type SquadActivityRow,
   type SquadMemberRow,
   type SquadMessageRow,
+  type SquadRow,
   type SquadSnapshot,
 } from "@/lib/supabase/squad";
 import { Button } from "@/components/ui/button";
@@ -49,15 +49,16 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { BlackjackGame } from "@/components/squad/blackjack-game";
-import {
-  loadBlackjackState,
-  type BlackjackBalance,
-  type WeeklyResult,
-} from "@/lib/supabase/blackjack";
 
 type MemberWithActivity = SquadMemberRow & {
   activity?: SquadActivityRow;
+};
+
+type SquadRealtimeEvent = {
+  table: "squads" | "squad_members" | "squad_activity" | "squad_messages";
+  eventType: "INSERT" | "UPDATE" | "DELETE" | "*";
+  new?: Record<string, unknown>;
+  old?: Record<string, unknown>;
 };
 
 export default function SquadPage() {
@@ -77,11 +78,7 @@ export default function SquadPage() {
   const [editingName, setEditingName] = useState(false);
   const [squadNameDraft, setSquadNameDraft] = useState("");
   const [confirmLeaveOpen, setConfirmLeaveOpen] = useState(false);
-  const [blackjackOpen, setBlackjackOpen] = useState(false);
-  const [blackjackBalances, setBlackjackBalances] = useState<BlackjackBalance[]>([]);
-  const [weeklyResults, setWeeklyResults] = useState<WeeklyResult[]>([]);
   const messagesListRef = useRef<HTMLDivElement | null>(null);
-  const refreshTimerRef = useRef<number | null>(null);
 
   const today = todayKey();
   const displayName = user?.name || user?.email?.split("@")[0] || "Racer";
@@ -129,20 +126,70 @@ export default function SquadPage() {
     setLoading(false);
   }, []);
 
-  const scheduleRefreshSquad = useCallback(() => {
-    if (refreshTimerRef.current) window.clearTimeout(refreshTimerRef.current);
-    refreshTimerRef.current = window.setTimeout(() => {
-      refreshTimerRef.current = null;
-      refreshSquad().catch(() => undefined);
-    }, 350);
-  }, [refreshSquad]);
+  const applyRealtimeEvent = useCallback((event?: SquadRealtimeEvent) => {
+    if (!event) return;
+    setSnapshot((current) => patchSquadSnapshot(current, event));
+  }, []);
 
-  useEffect(
-    () => () => {
-      if (refreshTimerRef.current) window.clearTimeout(refreshTimerRef.current);
-    },
-    [],
-  );
+  const patchOwnPublicActivity = useCallback(() => {
+    if (!user?.id) return;
+    const now = new Date().toISOString();
+    const ownActivity: SquadActivityRow = {
+      squad_id: snapshot?.squad.id ?? "",
+      user_id: user.id,
+      date: publicActivity.date,
+      kcal_in: Math.round(publicActivity.kcalIn),
+      kcal_out_activity: Math.round(publicActivity.kcalOutActivity),
+      workouts_count: publicActivity.workoutsCount,
+      meals_count: publicActivity.mealsCount,
+      streak: publicActivity.streaks.current_streak,
+      no_masturbation_streak:
+        publicActivity.noMasturbationStreaks?.current_streak ?? 0,
+      no_masturbation_longest_streak:
+        publicActivity.noMasturbationStreaks?.longest_streak ?? 0,
+      no_masturbation_logged_today:
+        publicActivity.noMasturbationLoggedToday ?? false,
+      goal_mode: publicActivity.goalMode ?? null,
+      goal_progress_pct: publicActivity.goalProgressPct ?? 0,
+      goal_delta_kg: publicActivity.goalDeltaKg ?? 0,
+      goal_target_delta_kg: publicActivity.goalTargetDeltaKg ?? 0,
+      calorie_target_met: publicActivity.calorieTargetMet ?? false,
+      exercise_done: publicActivity.exerciseDone ?? publicActivity.workoutsCount > 0,
+      updated_at: now,
+    };
+
+    setSnapshot((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        members: upsertBy(
+          current.members,
+          {
+            squad_id: current.squad.id,
+            user_id: user.id,
+            display_name: displayName,
+            avatar_url: profile.avatar_url ?? null,
+            color:
+              current.members.find((member) => member.user_id === user.id)?.color ??
+              "#dc0000",
+            role:
+              current.members.find((member) => member.user_id === user.id)?.role ??
+              "member",
+            last_seen_at: now,
+            joined_at:
+              current.members.find((member) => member.user_id === user.id)?.joined_at ??
+              now,
+          },
+          (member) => member.user_id,
+        ),
+        activity: upsertBy(
+          current.activity,
+          { ...ownActivity, squad_id: current.squad.id },
+          (activity) => `${activity.user_id}:${activity.date}`,
+        ),
+      };
+    });
+  }, [displayName, profile.avatar_url, publicActivity, snapshot?.squad.id, user?.id]);
 
   useEffect(() => {
     refreshSquad().catch((error) => {
@@ -153,8 +200,8 @@ export default function SquadPage() {
 
   useEffect(() => {
     if (!snapshot?.squad.id) return;
-    return subscribeToSquad(snapshot.squad.id, scheduleRefreshSquad);
-  }, [scheduleRefreshSquad, snapshot?.squad.id]);
+    return subscribeToSquad(snapshot.squad.id, applyRealtimeEvent);
+  }, [applyRealtimeEvent, snapshot?.squad.id]);
 
   useEffect(() => {
     if (!snapshot?.squad.id) return;
@@ -163,34 +210,37 @@ export default function SquadPage() {
       displayName,
       avatarUrl: profile.avatar_url ?? null,
     })
-      .then(scheduleRefreshSquad)
+      .then(patchOwnPublicActivity)
       .catch((error) => {
         toast.error(
           error instanceof Error ? error.message : "Could not sync squad stats",
         );
       });
-  }, [displayName, profile.avatar_url, publicActivity, scheduleRefreshSquad, snapshot?.squad.id]);
+  }, [displayName, patchOwnPublicActivity, profile.avatar_url, publicActivity, snapshot?.squad.id]);
+
+  useEffect(() => {
+    if (!snapshot?.squad.id) return;
+    const touch = () => {
+      if (document.visibilityState === "visible") {
+        touchMySquadPresence(snapshot.squad.id).catch(() => undefined);
+      }
+    };
+
+    touch();
+    const interval = window.setInterval(touch, 60_000);
+    document.addEventListener("visibilitychange", touch);
+
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", touch);
+    };
+  }, [snapshot?.squad.id]);
 
   useEffect(() => {
     const list = messagesListRef.current;
     if (!list) return;
     list.scrollTop = list.scrollHeight;
   }, [snapshot?.messages.length]);
-
-  useEffect(() => {
-    if (!snapshot?.squad.id) return;
-    let cancelled = false;
-    loadBlackjackState(snapshot.squad.id)
-      .then((state) => {
-        if (cancelled) return;
-        setBlackjackBalances(state.balances);
-        setWeeklyResults(state.weeklyResults);
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, [snapshot?.squad.id, blackjackOpen]);
 
   const members = useMemo<MemberWithActivity[]>(() => {
     const activityByUser = new Map(
@@ -294,7 +344,16 @@ export default function SquadPage() {
     if (!body) return;
 
     try {
-      await sendSquadMessage(snapshot.squad.id, body);
+      const sent = await sendSquadMessage(snapshot.squad.id, body);
+      if (sent) {
+        setSnapshot((current) =>
+          patchSquadSnapshot(current, {
+            table: "squad_messages",
+            eventType: "INSERT",
+            new: sent,
+          }),
+        );
+      }
       setMessage("");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not send message");
@@ -485,12 +544,6 @@ export default function SquadPage() {
         </div>
       )}
 
-      <BlackjackLeaderboard
-        balances={blackjackBalances}
-        weeklyResults={weeklyResults}
-        members={snapshot.members}
-      />
-
       <NoFapLeaderboard
         members={snapshot.members}
         activity={snapshot.activity.filter((item) => item.date === today)}
@@ -516,22 +569,10 @@ export default function SquadPage() {
 
       <Card className="premium-panel rounded-[1.8rem]">
         <CardHeader>
-          <div className="flex items-center justify-between gap-3">
-            <CardTitle className="flex items-center gap-2 font-heading text-base">
-              <MessageCircle className="size-4 text-[var(--rosso-light)]" />
-              Squad talk
-            </CardTitle>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-8 px-2 text-xs"
-              onClick={() => setBlackjackOpen(true)}
-            >
-              <Gamepad2 className="mr-1 size-4" />
-              21
-            </Button>
-          </div>
+          <CardTitle className="flex items-center gap-2 font-heading text-base">
+            <MessageCircle className="size-4 text-[var(--rosso-light)]" />
+            Squad talk
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div ref={messagesListRef} className="max-h-72 space-y-3 overflow-y-auto pr-1">
@@ -566,6 +607,7 @@ export default function SquadPage() {
               }}
             />
             <Button
+              aria-label="Send squad message"
               className="bg-[var(--rosso)] text-white hover:bg-[var(--rosso)]/90"
               onClick={handleSendMessage}
             >
@@ -604,14 +646,6 @@ export default function SquadPage() {
         Squad shares meals, calories, workouts, streaks, goal progress, and messages.
         Height, weight, birthdate, and body measurements stay private. No height or weight is shared.
       </p>
-      {blackjackOpen && (
-        <BlackjackGame
-          squadId={snapshot.squad.id}
-          members={snapshot.members}
-          objectivesDone={publicActivity.calorieTargetMet && publicActivity.exerciseDone}
-          onClose={() => setBlackjackOpen(false)}
-        />
-      )}
     </div>
   );
 }
@@ -640,69 +674,95 @@ function SquadHeader({
   );
 }
 
-function BlackjackLeaderboard({
-  balances,
-  weeklyResults,
-  members,
-}: {
-  balances: BlackjackBalance[];
-  weeklyResults: WeeklyResult[];
-  members: SquadMemberRow[];
-}) {
-  const nameFor = (userId: string) =>
-    members.find((member) => member.user_id === userId)?.display_name ?? "Player";
-
-  return (
-    <Card className="rounded-[1.45rem] border-white/7 bg-white/[0.04]">
-      <CardContent className="space-y-3 py-3">
-        <div className="flex items-center justify-between gap-2">
-          <p className="flex items-center gap-1.5 text-sm font-heading font-black">
-            <Trophy className="size-4 text-[var(--amber)]" />
-            Blackjack leaderboard
-          </p>
-          <span className="rounded-full border border-white/8 bg-black/25 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
-            Squad chips
-          </span>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-        <div>
-          <p className="mb-2 flex items-center gap-1 text-xs font-bold uppercase text-muted-foreground">
-            <Trophy className="size-3 text-[var(--amber)]" />
-            Current chips
-          </p>
-          <div className="space-y-1">
-            {balances.slice(0, 4).map((balance, index) => (
-              <p key={balance.user_id} className="flex justify-between gap-2 text-xs">
-                <span className="truncate">{index + 1}. {nameFor(balance.user_id)}</span>
-                <span className="font-bold text-[var(--rosso-light)]">{balance.chips}</span>
-              </p>
-            ))}
-            {balances.length === 0 && <p className="text-xs text-muted-foreground">No chips yet.</p>}
-          </div>
-        </div>
-        <div>
-          <p className="mb-2 flex items-center gap-1 text-xs font-bold uppercase text-muted-foreground">
-            <Trophy className="size-3 text-[var(--amber)]" />
-            Last week
-          </p>
-          <div className="space-y-1">
-            {weeklyResults.slice(0, 3).map((result) => (
-              <p key={result.user_id} className="flex justify-between gap-2 text-xs">
-                <span className="truncate">{result.rank}. {nameFor(result.user_id)}</span>
-                <span className="font-bold text-[var(--rosso-light)]">{result.chips}</span>
-              </p>
-            ))}
-            {weeklyResults.length === 0 && <p className="text-xs text-muted-foreground">No winner yet.</p>}
-          </div>
-        </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
 function dayWord(count: number) {
   return count === 1 ? "day" : "days";
+}
+
+function upsertBy<T>(
+  items: T[],
+  nextItem: T,
+  getKey: (item: T) => string,
+) {
+  const nextKey = getKey(nextItem);
+  let matched = false;
+  const nextItems = items.map((item) => {
+    if (getKey(item) !== nextKey) return item;
+    matched = true;
+    return { ...item, ...nextItem };
+  });
+  return matched ? nextItems : [...nextItems, nextItem];
+}
+
+function patchSquadSnapshot(
+  current: SquadSnapshot | null,
+  event: SquadRealtimeEvent,
+) {
+  if (!current) return current;
+
+  if (event.table === "squads") {
+    const row = (event.new ?? event.old) as Partial<SquadRow>;
+    if (row.id !== current.squad.id) return current;
+    if (event.eventType === "DELETE") return null;
+    return { ...current, squad: { ...current.squad, ...row } as SquadRow };
+  }
+
+  if (event.table === "squad_members") {
+    const row = (event.new ?? event.old) as Partial<SquadMemberRow>;
+    if (row.squad_id !== current.squad.id || !row.user_id) return current;
+    if (event.eventType === "DELETE") {
+      return {
+        ...current,
+        members: current.members.filter((member) => member.user_id !== row.user_id),
+      };
+    }
+    const members = upsertBy(
+      current.members,
+      row as SquadMemberRow,
+      (member) => member.user_id,
+    ).sort((a, b) => a.joined_at.localeCompare(b.joined_at));
+    return { ...current, members };
+  }
+
+  if (event.table === "squad_activity") {
+    const row = (event.new ?? event.old) as Partial<SquadActivityRow>;
+    if (row.squad_id !== current.squad.id || !row.user_id || !row.date) {
+      return current;
+    }
+    if (event.eventType === "DELETE") {
+      return {
+        ...current,
+        activity: current.activity.filter(
+          (activity) =>
+            activity.user_id !== row.user_id || activity.date !== row.date,
+        ),
+      };
+    }
+    return {
+      ...current,
+      activity: upsertBy(
+        current.activity,
+        row as SquadActivityRow,
+        (activity) => `${activity.user_id}:${activity.date}`,
+      ),
+    };
+  }
+
+  const row = (event.new ?? event.old) as Partial<SquadMessageRow>;
+  if (row.squad_id !== current.squad.id || !row.id) return current;
+  if (event.eventType === "DELETE") {
+    return {
+      ...current,
+      messages: current.messages.filter((message) => message.id !== row.id),
+    };
+  }
+  const messages = upsertBy(
+    current.messages,
+    row as SquadMessageRow,
+    (message) => message.id,
+  )
+    .sort((a, b) => a.created_at.localeCompare(b.created_at))
+    .slice(-50);
+  return { ...current, messages };
 }
 
 function NoFapLeaderboard({

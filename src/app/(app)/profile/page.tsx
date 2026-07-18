@@ -410,7 +410,7 @@ export default function ProfilePage() {
         <button
           onClick={toggleReminders}
           aria-label={remindersOn ? "Disable reminders" : "Enable reminders"}
-          className="flex w-full items-center justify-between rounded-[1.35rem] border border-white/7 bg-white/[0.045] px-4 py-3 backdrop-blur-xl"
+          className="flex w-full items-center justify-between rounded-[1.35rem] border border-white/7 bg-white/[0.045] px-4 py-3"
         >
           <div className="flex items-center gap-2">
             {remindersOn ? (
