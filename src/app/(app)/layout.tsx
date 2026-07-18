@@ -38,7 +38,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
     async function syncProfile() {
       if (!hydrated || !user) return;
-      if (profile || !isSupabaseConfigured()) {
+      if (!isSupabaseConfigured()) {
         setProfileChecked(true);
         return;
       }
@@ -56,7 +56,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [hydrated, user, profile, setProfile]);
+  }, [hydrated, user, setProfile]);
 
   useEffect(() => {
     let cancelled = false;

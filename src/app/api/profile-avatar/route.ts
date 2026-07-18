@@ -167,6 +167,15 @@ export async function POST(request: Request) {
     );
   }
 
+  const { error: squadAvatarError } = await supabase
+    .from("squad_members")
+    .update({ avatar_url: result.secure_url })
+    .eq("user_id", data.user.id);
+
+  if (squadAvatarError) {
+    console.error("Squad avatar sync failed", squadAvatarError);
+  }
+
   await deleteCloudinaryImage(
     config,
     (oldProfile as ProfileAvatarRow | null)?.avatar_public_id,
@@ -220,6 +229,15 @@ export async function DELETE() {
       { error: "Could not remove your profile picture." },
       { status: 400 },
     );
+  }
+
+  const { error: squadAvatarError } = await supabase
+    .from("squad_members")
+    .update({ avatar_url: null })
+    .eq("user_id", data.user.id);
+
+  if (squadAvatarError) {
+    console.error("Squad avatar removal sync failed", squadAvatarError);
   }
 
   await deleteCloudinaryImage(

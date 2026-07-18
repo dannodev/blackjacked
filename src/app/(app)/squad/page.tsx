@@ -997,7 +997,10 @@ function MessageBubble({
   return (
     <div className={isYou ? "flex items-end justify-end gap-2" : "flex items-end justify-start gap-2"}>
       {!isYou && (
-        <Avatar className="size-8 shrink-0 border border-white/10">
+        <Avatar
+          key={member?.avatar_url ?? `${member?.user_id ?? "unknown"}-fallback`}
+          className="size-8 shrink-0 border border-white/10"
+        >
           <AvatarImage src={member?.avatar_url ?? undefined} alt={member?.display_name ?? "Racer"} />
           <AvatarFallback
             className="font-heading text-[11px] text-white"
@@ -1020,7 +1023,10 @@ function MessageBubble({
         <p className="mt-1 text-sm">{message.body}</p>
       </div>
       {isYou && (
-        <Avatar className="size-8 shrink-0 border border-white/10">
+        <Avatar
+          key={member?.avatar_url ?? `${member?.user_id ?? "you"}-fallback`}
+          className="size-8 shrink-0 border border-white/10"
+        >
           <AvatarImage src={member?.avatar_url ?? undefined} alt={member?.display_name ?? "You"} />
           <AvatarFallback
             className="font-heading text-[11px] text-white"

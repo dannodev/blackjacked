@@ -1,61 +1,54 @@
 # BlackJacked
 
-Production fitness tracker for meals, workouts, progress check-ins, goals, and squads.
+<img src="public/blackjacked-logo.png" alt="BlackJacked" width="180" />
 
-## Production Environment
+**Fitness without the guesswork.** BlackJacked brings nutrition, training, progress, and accountability into one focused experience that works across devices.
 
-Set these in Vercel Project Settings -> Environment Variables.
+## Build consistency that lasts
 
-Public browser variables:
+BlackJacked is designed around the habits that actually move fitness forward. Instead of juggling a calorie tracker, workout log, progress gallery, and group chat, users get one private home for their entire journey.
+
+- **Know what to eat** — Track meals and macros, plan around personal calorie goals, and use AI-assisted nutrition tools when speed matters.
+- **Train with purpose** — Log workouts and see daily activity alongside nutrition instead of treating them as separate goals.
+- **See real progress** — Follow weight trends, measurements, check-in photos, streaks, and goal milestones over time.
+- **Stay accountable** — Create a squad, compare shared activity, celebrate streaks, and keep motivation alive through squad chat.
+- **Keep personal data personal** — Squads show only intentionally shared activity; sensitive body information remains private.
+- **Use it anywhere** — Cloud-backed profiles, logs, and photos keep the experience consistent across phone and desktop.
+
+## One daily loop
+
+BlackJacked turns a complicated fitness routine into a simple rhythm: set a goal, follow the day’s nutrition, record training, complete a check-in, and build momentum with a squad. The dashboard brings those signals together so users can understand what needs attention without digging through reports.
+
+## Product highlights
+
+- Personalized calorie and macro targets
+- Meal logging and menu planning
+- Workout and calorie-burn tracking
+- Weight, measurement, and photo check-ins
+- Goal progress and habit streaks
+- Private squad challenges, presence, leaderboards, and chat
+- English and Spanish experiences
+- Installable, mobile-first progressive web app
+
+## Technology
+
+BlackJacked is built with Next.js, React, TypeScript, Tailwind CSS, Supabase, and Cloudinary. Supabase powers authentication and synchronized app data, while Cloudinary securely manages optimized profile and progress imagery.
+
+## Development
+
+Create `.env.local` from `.env.example`, provide the required service credentials, then run:
 
 ```bash
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+npm install
+npm run dev
 ```
 
-Server-only variables:
-
-```bash
-GEMINI_API_KEY=
-CLOUDINARY_CLOUD_NAME=
-CLOUDINARY_API_KEY=
-CLOUDINARY_API_SECRET=
-```
-
-Never add server-only values to `NEXT_PUBLIC_*`, and never commit `.env.local`.
-
-## Supabase
-
-Before deploying a new database change:
-
-```bash
-supabase migration list --linked
-supabase db advisors --linked --fail-on none
-```
-
-Expected known warning on the free plan:
-
-```text
-auth_leaked_password_protection
-```
-
-All public app tables should have RLS enabled and forced. Browser roles should not have `TRUNCATE`, `TRIGGER`, or `REFERENCES` table privileges.
-
-## Local Verification
-
-Run this before pushing a production deployment:
+Before submitting changes, verify the project with:
 
 ```bash
 npm run lint
 npm test
 npm run build
-npm run test:e2e
-npm audit --omit=dev
 ```
 
-## Vercel Deploy
-
-1. Import the GitHub repository into Vercel.
-2. Add all production environment variables above.
-3. Deploy from `main`.
-4. After deploy, test sign-up, sign-in, AI macros, menu import, avatar upload, progress photo upload, and squad join.
+Server credentials must remain server-only and must never use the `NEXT_PUBLIC_` prefix.
