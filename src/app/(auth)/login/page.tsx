@@ -10,6 +10,8 @@ import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { authErrorMessage, emailSchema, passwordSchema } from "@/lib/auth-validation";
+import { t } from "@/lib/i18n";
+import { useStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,6 +33,7 @@ type Values = z.infer<typeof schema>;
 
 export default function LoginPage() {
   const { signIn } = useAuth();
+  const language = useStore((s) => s.language);
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -45,10 +48,10 @@ export default function LoginPage() {
     setFormError(null);
     try {
       await signIn(values.email, values.password);
-      toast.success("Welcome back");
+      toast.success(t(language, "Welcome back"));
       router.replace("/dashboard");
     } catch (err) {
-      const message = authErrorMessage(err, "Authentication failed.");
+      const message = t(language, authErrorMessage(err, "Authentication failed."));
       setFormError(message);
       toast.error(message);
     }
@@ -57,9 +60,9 @@ export default function LoginPage() {
   return (
     <Card className="premium-panel rounded-[1.7rem]">
       <CardHeader>
-        <CardTitle className="font-heading">Log in</CardTitle>
+        <CardTitle className="font-heading">{t(language, "Log in")}</CardTitle>
         <CardDescription>
-          Wilis chaparro me la pelas.
+          {t(language, "Wilis chaparro me la pelas.")}
         </CardDescription>
       </CardHeader>
       <form noValidate onSubmit={handleSubmit(onSubmit)}>
@@ -70,7 +73,7 @@ export default function LoginPage() {
             </div>
           )}
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">{t(language, "Email")}</Label>
             <Input
               id="email"
               type="email"
@@ -83,7 +86,7 @@ export default function LoginPage() {
             )}
           </div>
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">{t(language, "Password")}</Label>
             <div className="relative">
               <Input
                 id="password"
@@ -94,7 +97,7 @@ export default function LoginPage() {
               />
               <button
                 type="button"
-                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-label={t(language, showPassword ? "Hide password" : "Show password")}
                 className="absolute inset-y-0 right-2 flex w-9 items-center justify-center rounded-full text-muted-foreground transition hover:bg-white/10 hover:text-foreground"
                 onClick={() => setShowPassword((visible) => !visible)}
               >
@@ -115,16 +118,16 @@ export default function LoginPage() {
               className="w-full bg-[var(--rosso)] font-semibold text-white hover:bg-[var(--rosso)]/90"
               disabled={isSubmitting}
             >
-              {isSubmitting ? "Burning in…" : "Log in"}
+              {isSubmitting ? t(language, "Burning in…") : t(language, "Log in")}
             </Button>
           </div>
           <p className="text-sm text-muted-foreground">
-            No account?{" "}
+            {t(language, "No account?")}{" "}
             <Link
               href="/signup"
               className="font-medium text-[var(--rosso-light)] underline-offset-4 hover:underline"
             >
-              Create one
+              {t(language, "Create one")}
             </Link>
           </p>
         </CardFooter>

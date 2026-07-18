@@ -86,8 +86,10 @@ export async function POST(request: Request) {
 
   const fileValue = formData.get("file");
   const textValue = formData.get("text");
+  const languageValue = formData.get("language");
   const file = fileValue instanceof File && fileValue.size > 0 ? fileValue : null;
   const rawText = typeof textValue === "string" ? textValue.trim() : "";
+  const language = languageValue === "es" ? "es" : "en";
   const menuText = rawText.slice(0, MAX_TEXT_CHARS);
 
   if (!file && !menuText) {
@@ -123,6 +125,7 @@ Rules:
 - Keep names short and user-friendly.
 - Use a single food emoji per meal.
 - Return at most 80 meals.
+- Return meal names, descriptions, and meal_slot in ${language === "es" ? "Spanish" : "English"}.
 ${menuText ? `\nPasted menu text:\n${menuText}` : ""}`;
 
   try {

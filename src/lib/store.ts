@@ -16,7 +16,7 @@ import type {
   SquadMember,
   DailySummary,
 } from "./types";
-import { todayKey } from "./types";
+import { computeDay, normalizeGoal, sameDay, todayKey } from "./types";
 import { FOODS } from "./foods-seed";
 import { makeId } from "./id";
 import type { MenuMealPreset } from "./menu-meals";
@@ -24,6 +24,7 @@ import type { MenuMealPreset } from "./menu-meals";
 const DB_KEY = "blackjacked-store-v1";
 
 export const SEED_FOODS: FoodItem[] = FOODS;
+export type Language = "en" | "es";
 
 const idbStorage = {
   getItem: async (name: string): Promise<string | null> => {
@@ -47,6 +48,7 @@ const idbStorage = {
 
 interface State {
   hydrated: boolean;
+  language: Language;
   profile: Profile | null;
   meals: Meal[];
   exerciseLogs: ExerciseLog[];
@@ -58,11 +60,15 @@ interface State {
   useDefaultMenu: boolean;
   dailySummaries: DailySummary[];
   streaks: Streaks;
+  streakDates: string[];
+  noMasturbationStreaks: Streaks;
+  noMasturbationDates: string[];
   waterToday: number;
   sleepToday: number;
   notesToday: string;
   aiTokenCount: number;
   squad: Squad | null;
+  setLanguage: (language: Language) => void;
   setProfile: (p: Profile) => void;
   updateProfile: (patch: Partial<Profile>) => void;
   setMeals: (meals: Meal[]) => void;
@@ -86,7 +92,8 @@ interface State {
   setSleep: (h: number) => void;
   setNotes: (s: string) => void;
   bumpAiTokens: (n: number) => void;
-  touchStreak: () => void;
+  refreshQualifiedStreak: () => void;
+  logNoMasturbationDay: () => void;
   createSquad: (name: string) => void;
   addSquadMember: (m: Omit<SquadMember, "id">) => void;
   updateSquadMember: (id: string, patch: Partial<SquadMember>) => void;
@@ -99,10 +106,54 @@ function emptyStreaks(): Streaks {
   return { current_streak: 0, longest_streak: 0, last_logged_date: null };
 }
 
+function computeStreaksFromDates(dates: string[], at = todayKey()): Streaks {
+  const uniqueDates = [...new Set(dates)].sort();
+  if (uniqueDates.length === 0) return emptyStreaks();
+
+  let longest = 0;
+  let run = 0;
+  let previous: string | null = null;
+  for (const date of uniqueDates) {
+    if (!previous) {
+      run = 1;
+    } else {
+      const diff = Math.round(
+        (new Date(date).getTime() - new Date(previous).getTime()) / 86_400_000,
+      );
+      run = diff === 1 ? run + 1 : 1;
+    }
+    longest = Math.max(longest, run);
+    previous = date;
+  }
+
+  const latest = uniqueDates[uniqueDates.length - 1];
+  const daysSinceLatest = Math.round(
+    (new Date(at).getTime() - new Date(latest).getTime()) / 86_400_000,
+  );
+  let current = 0;
+  if (daysSinceLatest <= 1) {
+    current = 1;
+    const cursor = new Date(`${latest}T00:00:00`);
+    while (true) {
+      cursor.setDate(cursor.getDate() - 1);
+      const key = todayKey(cursor);
+      if (!uniqueDates.includes(key)) break;
+      current += 1;
+    }
+  }
+
+  return {
+    current_streak: current,
+    longest_streak: longest,
+    last_logged_date: latest,
+  };
+}
+
 export const useStore = create<State>()(
   persist(
     (set, get) => ({
       hydrated: false,
+      language: "en",
       profile: null,
       meals: [],
       exerciseLogs: [],
@@ -114,45 +165,64 @@ export const useStore = create<State>()(
       useDefaultMenu: true,
       dailySummaries: [],
       streaks: emptyStreaks(),
+      streakDates: [],
+      noMasturbationStreaks: emptyStreaks(),
+      noMasturbationDates: [],
       waterToday: 0,
       sleepToday: 0,
       notesToday: "",
       aiTokenCount: 0,
       squad: null,
+      setLanguage: (language) => set({ language }),
 
-      setProfile: (p) => set({ profile: p }),
-      updateProfile: (patch) =>
-        set((s) => (s.profile ? { profile: { ...s.profile, ...patch } } : {})),
+      setProfile: (p) => {
+        set({ profile: p });
+        get().refreshQualifiedStreak();
+      },
+      updateProfile: (patch) => {
+        set((s) => (s.profile ? { profile: { ...s.profile, ...patch } } : {}));
+        get().refreshQualifiedStreak();
+      },
 
       setMeals: (meals) =>
+        {
         set((s) => {
           const localById = new Map(s.meals.map((meal) => [meal.id, meal]));
           const mergedById = new Map(localById);
           for (const meal of meals) mergedById.set(meal.id, meal);
           return { meals: [...mergedById.values()] };
-        }),
+        });
+        get().refreshQualifiedStreak();
+      },
 
       addMeal: (m) => {
         set((s) => ({ meals: [...s.meals, m] }));
-        get().touchStreak();
+        get().refreshQualifiedStreak();
       },
-      deleteMeal: (id) =>
-        set((s) => ({ meals: s.meals.filter((m) => m.id !== id) })),
+      deleteMeal: (id) => {
+        set((s) => ({ meals: s.meals.filter((m) => m.id !== id) }));
+        get().refreshQualifiedStreak();
+      },
 
       setExerciseLogs: (logs) =>
+        {
         set((s) => {
           const localById = new Map(s.exerciseLogs.map((log) => [log.id, log]));
           const mergedById = new Map(localById);
           for (const log of logs) mergedById.set(log.id, log);
           return { exerciseLogs: [...mergedById.values()] };
-        }),
+        });
+        get().refreshQualifiedStreak();
+      },
 
       addExerciseLog: (e) => {
         set((s) => ({ exerciseLogs: [...s.exerciseLogs, e] }));
-        get().touchStreak();
+        get().refreshQualifiedStreak();
       },
-      deleteExerciseLog: (id) =>
-        set((s) => ({ exerciseLogs: s.exerciseLogs.filter((e) => e.id !== id) })),
+      deleteExerciseLog: (id) => {
+        set((s) => ({ exerciseLogs: s.exerciseLogs.filter((e) => e.id !== id) }));
+        get().refreshQualifiedStreak();
+      },
       toggleFavoriteExercise: (id) =>
         set((s) => ({
           favoriteExerciseIds: s.favoriteExerciseIds.includes(id)
@@ -265,26 +335,39 @@ export const useStore = create<State>()(
 
       leaveSquad: () => set({ squad: null }),
 
-      touchStreak: () => {
+      refreshQualifiedStreak: () => {
         const today = todayKey();
         set((s) => {
-          if (s.streaks.last_logged_date === today) return {};
-          const prev = s.streaks.last_logged_date;
-          let current = 1;
-          if (prev) {
-            const diff = Math.round(
-              (new Date(today).getTime() - new Date(prev).getTime()) /
-                86_400_000,
-            );
-            current = diff === 1 ? s.streaks.current_streak + 1 : 1;
-          }
-          const longest = Math.max(current, s.streaks.longest_streak);
+          if (!s.profile) return {};
+          const todayMeals = s.meals.filter((meal) => sameDay(meal.loggedAt, today));
+          const todayExercises = s.exerciseLogs.filter((log) => sameDay(log.loggedAt, today));
+          const day = computeDay(todayMeals, todayExercises, s.profile);
+          const goal = normalizeGoal(s.profile);
+          const calorieTargetMet =
+            goal.mode === "gain"
+              ? day.kcal_in >= s.profile.calorie_goal
+              : goal.mode === "maintain"
+                ? Math.abs(day.kcal_in - s.profile.calorie_goal) <= 150
+                : day.kcal_in <= s.profile.calorie_goal && day.kcal_in > 0;
+          const qualifies = calorieTargetMet && todayExercises.length > 0;
+          const existingDates = s.streakDates ?? [];
+          const nextDates = qualifies
+            ? [...new Set([...existingDates, today])].sort()
+            : existingDates.filter((date) => date !== today);
           return {
-            streaks: {
-              current_streak: current,
-              longest_streak: longest,
-              last_logged_date: today,
-            },
+            streakDates: nextDates,
+            streaks: computeStreaksFromDates(nextDates, today),
+          };
+        });
+      },
+
+      logNoMasturbationDay: () => {
+        const today = todayKey();
+        set((s) => {
+          const nextDates = [...new Set([...(s.noMasturbationDates ?? []), today])].sort();
+          return {
+            noMasturbationDates: nextDates,
+            noMasturbationStreaks: computeStreaksFromDates(nextDates, today),
           };
         });
       },
@@ -302,11 +385,15 @@ export const useStore = create<State>()(
           useDefaultMenu: true,
           dailySummaries: [],
           streaks: emptyStreaks(),
+          streakDates: [],
+          noMasturbationStreaks: emptyStreaks(),
+          noMasturbationDates: [],
           waterToday: 0,
           sleepToday: 0,
           notesToday: "",
           aiTokenCount: 0,
           squad: null,
+          language: "en",
         }),
     }),
     {

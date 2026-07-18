@@ -8,7 +8,11 @@ import { useCloudMeals } from "@/lib/use-cloud-meals";
 import { makeId } from "@/lib/id";
 import type { FoodItem, Meal, MealItem, MealType } from "@/lib/types";
 import { MEAL_LABELS } from "@/lib/types";
-import { MENU_MEAL_PRESETS, type MenuMealPreset } from "@/lib/menu-meals";
+import {
+  localizeMenuMeal,
+  MENU_MEAL_PRESETS,
+  type MenuMealPreset,
+} from "@/lib/menu-meals";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -44,12 +48,18 @@ function MenuMealsLog() {
   const profile = useStore((s) => s.profile)!;
   const customMenuMeals = useStore((s) => s.customMenuMeals);
   const useDefaultMenu = useStore((s) => s.useDefaultMenu);
+  const language = useStore((s) => s.language);
   const [logged, setLogged] = useState<Set<string>>(new Set());
   const [mealFilter, setMealFilter] = useState<MealType | "all">("all");
 
   const allMenuMeals = useMemo(
-    () => [...(useDefaultMenu ? MENU_MEAL_PRESETS : []), ...customMenuMeals],
-    [customMenuMeals, useDefaultMenu],
+    () => [
+      ...(useDefaultMenu
+        ? MENU_MEAL_PRESETS.map((meal) => localizeMenuMeal(meal, language))
+        : []),
+      ...customMenuMeals,
+    ],
+    [customMenuMeals, language, useDefaultMenu],
   );
 
   const menuMeals = useMemo(() => {

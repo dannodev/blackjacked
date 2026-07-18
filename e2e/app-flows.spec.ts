@@ -98,6 +98,19 @@ test("menu import reviews and saves extracted meals", async ({ page }) => {
   await expect(page.getByText("Imported meals saved to Your Menu")).toBeVisible();
 });
 
+test("Spanish toggle changes the target label and localizes the default menu", async ({ page }) => {
+  await page.goto("/menu?__e2eAuth=1");
+
+  const languageToggle = page.locator("button[data-no-translate]");
+  await expect(languageToggle).toHaveText("ES");
+  await languageToggle.click();
+
+  await expect(languageToggle).toHaveText("EN");
+  await expect(page.getByRole("heading", { name: "Tu menú" })).toBeVisible();
+  await expect(page.getByText("Avena con manzana y canela")).toBeVisible();
+  await expect(page.getByText("Pollo al ajo y limón")).toBeVisible();
+});
+
 test("profile avatar uploads through the cloud route and can be removed", async ({ page }) => {
   await page.route("**/api/profile-avatar", async (route) => {
     if (route.request().method() === "DELETE") {

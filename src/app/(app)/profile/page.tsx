@@ -124,12 +124,11 @@ async function deleteAvatar() {
 }
 
 export default function ProfilePage() {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const profile = useStore((s) => s.profile)!;
   const updateProfile = useStore((s) => s.updateProfile);
   const streaks = useStore((s) => s.streaks);
   const resetAll = useStore((s) => s.resetAll);
-  const router = useRouter();
   const [remindersOn, setRemindersOn] = useState(false);
   const [savingTimes, setSavingTimes] = useState(false);
   const [savingGoal, setSavingGoal] = useState(false);
@@ -138,6 +137,7 @@ export default function ProfilePage() {
   const [editingSection, setEditingSection] = useState<
     "stats" | "goal" | "meals" | null
   >(null);
+  const router = useRouter();
 
   useEffect(() => {
     const stored = localStorage.getItem("blackjacked.reminders");
@@ -437,16 +437,6 @@ export default function ProfilePage() {
           onClick={handleReset}
         >
           Reset all data
-        </Button>
-        <Button
-          variant="ghost"
-          className="w-full"
-          onClick={async () => {
-            await signOut();
-            router.replace("/login");
-          }}
-        >
-          Log out
         </Button>
       </div>
     </div>

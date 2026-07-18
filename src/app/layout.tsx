@@ -23,7 +23,7 @@ export const metadata: Metadata = {
   applicationName: "BlackJacked",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent",
+    statusBarStyle: "black",
     title: "BlackJacked",
   },
   formatDetection: { telephone: false },

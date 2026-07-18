@@ -6,7 +6,11 @@ import { toast } from "sonner";
 import { useStore } from "@/lib/store";
 import { makeId } from "@/lib/id";
 import { MEAL_LABELS, type MealType } from "@/lib/types";
-import { MENU_MEAL_PRESETS, type MenuMealPreset } from "@/lib/menu-meals";
+import {
+  localizeMenuMeal,
+  MENU_MEAL_PRESETS,
+  type MenuMealPreset,
+} from "@/lib/menu-meals";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -46,6 +50,7 @@ export default function MenuPage() {
   const setUseDefaultMenu = useStore((s) => s.setUseDefaultMenu);
   const addCustomMenuMeal = useStore((s) => s.addCustomMenuMeal);
   const deleteCustomMenuMeal = useStore((s) => s.deleteCustomMenuMeal);
+  const language = useStore((s) => s.language);
 
   const [type, setType] = useState<MealType>("lunch");
   const [name, setName] = useState("");
@@ -61,8 +66,13 @@ export default function MenuPage() {
   const [importModel, setImportModel] = useState<string | null>(null);
 
   const menuMeals = useMemo(
-    () => [...(useDefaultMenu ? MENU_MEAL_PRESETS : []), ...customMenuMeals],
-    [customMenuMeals, useDefaultMenu],
+    () => [
+      ...(useDefaultMenu
+        ? MENU_MEAL_PRESETS.map((meal) => localizeMenuMeal(meal, language))
+        : []),
+      ...customMenuMeals,
+    ],
+    [customMenuMeals, language, useDefaultMenu],
   );
 
   function addMealToMenu() {
@@ -135,6 +145,7 @@ export default function MenuPage() {
       const formData = new FormData();
       if (importFile) formData.set("file", importFile);
       if (importText.trim()) formData.set("text", importText.trim());
+      formData.set("language", language);
 
       const response = await fetch("/api/menu-import", {
         method: "POST",

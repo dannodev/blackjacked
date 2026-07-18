@@ -89,6 +89,9 @@ describe("useStore", () => {
       customMenuMeals: [],
       useDefaultMenu: true,
       streaks: { current_streak: 0, longest_streak: 0, last_logged_date: null },
+      streakDates: [],
+      noMasturbationStreaks: { current_streak: 0, longest_streak: 0, last_logged_date: null },
+      noMasturbationDates: [],
       waterToday: 0,
       sleepToday: 0,
       notesToday: "",
@@ -308,6 +311,33 @@ describe("useStore", () => {
 
       useStore.getState().leaveSquad();
       expect(useStore.getState().squad).toBeNull();
+    });
+  });
+
+  describe("qualified streaks", () => {
+    it("does not count a streak for meals alone", () => {
+      useStore.getState().setProfile(profileFixture());
+      useStore.getState().addMeal(mealFixture({ total_kcal: 800 }));
+
+      expect(useStore.getState().streaks.current_streak).toBe(0);
+    });
+
+    it("counts a fitness streak only after calories and exercise qualify", () => {
+      useStore.getState().setProfile(profileFixture({ goal_mode: "lose", calorie_goal: 2000 }));
+      useStore.getState().addMeal(mealFixture({ total_kcal: 800 }));
+      useStore.getState().addExerciseLog(exerciseLogFixture());
+
+      expect(useStore.getState().streaks.current_streak).toBe(1);
+      expect(useStore.getState().streaks.last_logged_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    });
+
+    it("logs the no-masturbation streak once per day", () => {
+      useStore.getState().logNoMasturbationDay();
+      useStore.getState().logNoMasturbationDay();
+
+      const state = useStore.getState();
+      expect(state.noMasturbationStreaks.current_streak).toBe(1);
+      expect(state.noMasturbationDates).toHaveLength(1);
     });
   });
 

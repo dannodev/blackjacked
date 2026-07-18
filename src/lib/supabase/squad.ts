@@ -28,8 +28,10 @@ export type SquadMemberRow = {
   squad_id: string;
   user_id: string;
   display_name: string;
+  avatar_url: string | null;
   color: string;
   role: "owner" | "member";
+  last_seen_at: string | null;
   joined_at: string;
 };
 
@@ -42,6 +44,9 @@ export type SquadActivityRow = {
   workouts_count: number;
   meals_count: number;
   streak: number;
+  no_masturbation_streak: number;
+  no_masturbation_longest_streak: number;
+  no_masturbation_logged_today: boolean;
   goal_mode: "lose" | "gain" | "maintain" | null;
   goal_progress_pct: number;
   goal_delta_kg: number;
@@ -73,6 +78,8 @@ export type PublicActivityInput = {
   workoutsCount: number;
   mealsCount: number;
   streaks: Streaks;
+  noMasturbationStreaks?: Streaks;
+  noMasturbationLoggedToday?: boolean;
   goalMode?: "lose" | "gain" | "maintain";
   goalProgressPct?: number;
   goalDeltaKg?: number;
@@ -80,6 +87,37 @@ export type PublicActivityInput = {
   calorieTargetMet?: boolean;
   exerciseDone?: boolean;
 };
+
+function webCrypto() {
+  return typeof globalThis !== "undefined" ? globalThis.crypto : undefined;
+}
+
+function randomBytes(length: number) {
+  const values = new Uint8Array(length);
+  const cryptoApi = webCrypto();
+  if (cryptoApi?.getRandomValues) {
+    cryptoApi.getRandomValues(values);
+    return values;
+  }
+
+  for (let index = 0; index < values.length; index += 1) {
+    values[index] = Math.floor(Math.random() * 256);
+  }
+  return values;
+}
+
+function randomId() {
+  const cryptoApi = webCrypto();
+  if (cryptoApi?.randomUUID) return cryptoApi.randomUUID();
+
+  const bytes = randomBytes(16);
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0"));
+  return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex
+    .slice(6, 8)
+    .join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10).join("")}`;
+}
 
 function e2eSnapshot(): SquadSnapshot {
   return {
@@ -96,8 +134,10 @@ function e2eSnapshot(): SquadSnapshot {
         squad_id: "00000000-0000-4000-8000-0000000000aa",
         user_id: E2E_USER_ID,
         display_name: "E2E Racer",
+        avatar_url: null,
         color: SQUAD_COLORS[0],
         role: "member",
+        last_seen_at: new Date().toISOString(),
         joined_at: new Date().toISOString(),
       },
     ],
@@ -151,12 +191,13 @@ async function getCurrentUserId() {
 
 function generateInviteCode() {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  const bytes = crypto.getRandomValues(new Uint8Array(6));
+  const bytes = randomBytes(6);
   return Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join("");
 }
 
 async function loadSquadById(squadId: string): Promise<SquadSnapshot> {
   const supabase = requireSupabase();
+  await deleteExpiredSquadMessages(squadId);
 
   const [squadResult, membersResult, activityResult, messagesResult] =
     await Promise.all([
@@ -221,7 +262,7 @@ export async function createRemoteSquad(name: string, displayName: string) {
 
   const supabase = requireSupabase();
   const userId = await getCurrentUserId();
-  const squadId = crypto.randomUUID();
+  const squadId = randomId();
   const inviteCode = generateInviteCode();
 
   const { error: squadError } = await supabase.from("squads").insert({
@@ -236,8 +277,10 @@ export async function createRemoteSquad(name: string, displayName: string) {
     squad_id: squadId,
     user_id: userId,
     display_name: displayName,
+    avatar_url: null,
     color: SQUAD_COLORS[0],
     role: "owner",
+    last_seen_at: new Date().toISOString(),
   });
   if (memberError) throw memberError;
 
@@ -267,13 +310,15 @@ export async function joinRemoteSquad(inviteCode: string, displayName: string) {
   if (squadError) throw squadError;
   if (!squad?.id) throw new Error("Invalid squad code");
 
-  const colorIndex = crypto.getRandomValues(new Uint8Array(1))[0] % SQUAD_COLORS.length;
+  const colorIndex = randomBytes(1)[0] % SQUAD_COLORS.length;
   const { error: memberError } = await supabase.from("squad_members").insert({
     squad_id: squad.id,
     user_id: userId,
     display_name: displayName.trim() || "Racer",
+    avatar_url: null,
     color: SQUAD_COLORS[colorIndex],
     role: "member",
+    last_seen_at: new Date().toISOString(),
   });
 
   if (memberError) throw memberError;
@@ -298,9 +343,55 @@ export async function leaveRemoteSquad(squadId: string) {
   if (error) throw error;
 }
 
+export async function updateRemoteSquadName(squadId: string, name: string) {
+  const cleanName = name.trim();
+  if (cleanName.length < 2) throw new Error("Squad name is too short.");
+  if (cleanName.length > 40) throw new Error("Squad name is too long.");
+
+  if (canUseE2EAuthBypass()) {
+    const snapshot = getE2eSquad();
+    if (!snapshot) return snapshot;
+    snapshot.squad.name = cleanName;
+    snapshot.squad.updated_at = new Date().toISOString();
+    setE2eSquad(snapshot);
+    return snapshot;
+  }
+
+  const supabase = requireSupabase();
+  const { error } = await supabase
+    .from("squads")
+    .update({ name: cleanName, updated_at: new Date().toISOString() })
+    .eq("id", squadId);
+
+  if (error) throw error;
+  return loadSquadById(squadId);
+}
+
+export async function touchMySquadPresence(squadId: string) {
+  if (canUseE2EAuthBypass()) {
+    const snapshot = getE2eSquad();
+    if (!snapshot) return;
+    const member = snapshot.members.find((item) => item.user_id === E2E_USER_ID);
+    if (member) member.last_seen_at = new Date().toISOString();
+    setE2eSquad(snapshot);
+    return;
+  }
+
+  const supabase = requireSupabase();
+  const userId = await getCurrentUserId();
+  const { error } = await supabase
+    .from("squad_members")
+    .update({ last_seen_at: new Date().toISOString() })
+    .eq("squad_id", squadId)
+    .eq("user_id", userId);
+
+  if (error) throw error;
+}
+
 export async function syncMySquadActivity(
   squadId: string,
   activity: PublicActivityInput,
+  memberProfile?: { displayName?: string; avatarUrl?: string | null },
 ) {
   if (canUseE2EAuthBypass()) {
     const snapshot = getE2eSquad();
@@ -315,6 +406,9 @@ export async function syncMySquadActivity(
         workouts_count: activity.workoutsCount,
         meals_count: activity.mealsCount,
         streak: activity.streaks.current_streak,
+        no_masturbation_streak: activity.noMasturbationStreaks?.current_streak ?? 0,
+        no_masturbation_longest_streak: activity.noMasturbationStreaks?.longest_streak ?? 0,
+        no_masturbation_logged_today: activity.noMasturbationLoggedToday ?? false,
         goal_mode: activity.goalMode ?? null,
         goal_progress_pct: activity.goalProgressPct ?? 0,
         goal_delta_kg: activity.goalDeltaKg ?? 0,
@@ -330,28 +424,43 @@ export async function syncMySquadActivity(
 
   const supabase = requireSupabase();
   const userId = await getCurrentUserId();
-  const { error } = await supabase.from("squad_activity").upsert(
-    {
-      squad_id: squadId,
-      user_id: userId,
-      date: activity.date,
-      kcal_in: Math.round(activity.kcalIn),
-      kcal_out_activity: Math.round(activity.kcalOutActivity),
-      workouts_count: activity.workoutsCount,
-      meals_count: activity.mealsCount,
-      streak: activity.streaks.current_streak,
-      goal_mode: activity.goalMode ?? null,
-      goal_progress_pct: activity.goalProgressPct ?? 0,
-      goal_delta_kg: activity.goalDeltaKg ?? 0,
-      goal_target_delta_kg: activity.goalTargetDeltaKg ?? 0,
-      calorie_target_met: activity.calorieTargetMet ?? false,
-      exercise_done: activity.exerciseDone ?? activity.workoutsCount > 0,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "squad_id,user_id,date" },
-  );
+  const [activityResult, memberResult] = await Promise.all([
+    supabase.from("squad_activity").upsert(
+      {
+        squad_id: squadId,
+        user_id: userId,
+        date: activity.date,
+        kcal_in: Math.round(activity.kcalIn),
+        kcal_out_activity: Math.round(activity.kcalOutActivity),
+        workouts_count: activity.workoutsCount,
+        meals_count: activity.mealsCount,
+        streak: activity.streaks.current_streak,
+        no_masturbation_streak: activity.noMasturbationStreaks?.current_streak ?? 0,
+        no_masturbation_longest_streak: activity.noMasturbationStreaks?.longest_streak ?? 0,
+        no_masturbation_logged_today: activity.noMasturbationLoggedToday ?? false,
+        goal_mode: activity.goalMode ?? null,
+        goal_progress_pct: activity.goalProgressPct ?? 0,
+        goal_delta_kg: activity.goalDeltaKg ?? 0,
+        goal_target_delta_kg: activity.goalTargetDeltaKg ?? 0,
+        calorie_target_met: activity.calorieTargetMet ?? false,
+        exercise_done: activity.exerciseDone ?? activity.workoutsCount > 0,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "squad_id,user_id,date" },
+    ),
+    supabase
+      .from("squad_members")
+      .update({
+        display_name: memberProfile?.displayName?.trim() || "Racer",
+        avatar_url: memberProfile?.avatarUrl ?? null,
+        last_seen_at: new Date().toISOString(),
+      })
+      .eq("squad_id", squadId)
+      .eq("user_id", userId),
+  ]);
 
-  if (error) throw error;
+  if (activityResult.error) throw activityResult.error;
+  if (memberResult.error) throw memberResult.error;
 }
 
 export async function sendSquadMessage(squadId: string, body: string) {
@@ -359,7 +468,7 @@ export async function sendSquadMessage(squadId: string, body: string) {
     const snapshot = getE2eSquad();
     if (!snapshot) return;
     snapshot.messages.push({
-      id: crypto.randomUUID(),
+      id: randomId(),
       squad_id: squadId,
       user_id: E2E_USER_ID,
       body,
@@ -380,9 +489,37 @@ export async function sendSquadMessage(squadId: string, body: string) {
   if (error) throw error;
 }
 
+export async function deleteExpiredSquadMessages(squadId: string) {
+  if (canUseE2EAuthBypass()) {
+    const snapshot = getE2eSquad();
+    if (!snapshot) return;
+    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    snapshot.messages = snapshot.messages.filter(
+      (message) => new Date(message.created_at).getTime() >= cutoff,
+    );
+    setE2eSquad(snapshot);
+    return;
+  }
+
+  const supabase = requireSupabase();
+  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const { error } = await supabase
+    .from("squad_messages")
+    .delete()
+    .eq("squad_id", squadId)
+    .lt("created_at", cutoff);
+
+  if (error) throw error;
+}
+
 export function subscribeToSquad(
   squadId: string,
-  onChange: () => void,
+  onChange: (event?: {
+    table: "squads" | "squad_members" | "squad_activity" | "squad_messages";
+    eventType: "INSERT" | "UPDATE" | "DELETE" | "*";
+    new?: Record<string, unknown>;
+    old?: Record<string, unknown>;
+  }) => void,
 ) {
   if (canUseE2EAuthBypass()) {
     void squadId;
@@ -391,12 +528,19 @@ export function subscribeToSquad(
   }
 
   const supabase = requireSupabase();
+  const topic = `squad:${squadId}:${randomId()}`;
   const channel = supabase
-    .channel(`squad:${squadId}`)
+    .channel(topic)
     .on(
       "postgres_changes",
       { event: "*", schema: "public", table: "squads", filter: `id=eq.${squadId}` },
-      onChange,
+      (payload) =>
+        onChange({
+          table: "squads",
+          eventType: payload.eventType,
+          new: payload.new,
+          old: payload.old,
+        }),
     )
     .on(
       "postgres_changes",
@@ -406,7 +550,13 @@ export function subscribeToSquad(
         table: "squad_members",
         filter: `squad_id=eq.${squadId}`,
       },
-      onChange,
+      (payload) =>
+        onChange({
+          table: "squad_members",
+          eventType: payload.eventType,
+          new: payload.new,
+          old: payload.old,
+        }),
     )
     .on(
       "postgres_changes",
@@ -416,7 +566,13 @@ export function subscribeToSquad(
         table: "squad_activity",
         filter: `squad_id=eq.${squadId}`,
       },
-      onChange,
+      (payload) =>
+        onChange({
+          table: "squad_activity",
+          eventType: payload.eventType,
+          new: payload.new,
+          old: payload.old,
+        }),
     )
     .on(
       "postgres_changes",
@@ -426,7 +582,13 @@ export function subscribeToSquad(
         table: "squad_messages",
         filter: `squad_id=eq.${squadId}`,
       },
-      onChange,
+      (payload) =>
+        onChange({
+          table: "squad_messages",
+          eventType: payload.eventType,
+          new: payload.new,
+          old: payload.old,
+        }),
     )
     .subscribe();
 

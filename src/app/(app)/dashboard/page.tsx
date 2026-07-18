@@ -34,6 +34,7 @@ import {
   Dumbbell,
   Utensils,
   Trash2,
+  Banana,
 } from "lucide-react";
 import Link from "next/link";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -48,11 +49,15 @@ import {
 import { Button } from "@/components/ui/button";
 import { saveSupabaseDailySummary } from "@/lib/supabase/daily-summary";
 import { loadMySquad, type SquadSnapshot } from "@/lib/supabase/squad";
+import { t } from "@/lib/i18n";
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const profile = useStore((s) => s.profile)!;
   const streaks = useStore((s) => s.streaks);
+  const noMasturbationStreaks = useStore((s) => s.noMasturbationStreaks);
+  const logNoMasturbationDay = useStore((s) => s.logNoMasturbationDay);
+  const language = useStore((s) => s.language);
   const waterToday = useStore((s) => s.waterToday);
   const sleepToday = useStore((s) => s.sleepToday);
   const setWater = useStore((s) => s.setWater);
@@ -64,9 +69,13 @@ export default function DashboardPage() {
   const { addMeal, deleteMeal } = useCloudMeals();
   const { addExerciseLog } = useCloudExerciseLogs();
   const [selectedMenuMeal, setSelectedMenuMeal] = useState<MenuMealOption | null>(null);
+  const [confirmNoFapOpen, setConfirmNoFapOpen] = useState(false);
   const [squadSnapshot, setSquadSnapshot] = useState<SquadSnapshot | null>(null);
   const { meals, exerciseLogs } = useTodayData();
   const day = computeDay(meals, exerciseLogs, profile);
+  const today = dateKey(new Date());
+  const noMasturbationLoggedToday =
+    noMasturbationStreaks.last_logged_date === today;
 
   const firstName = user?.name?.split(" ")[0] ?? "Athlete";
 
@@ -78,6 +87,10 @@ export default function DashboardPage() {
     profile.meal_schedule,
     new Date(),
     menuMeals,
+    language,
+  );
+  const loggedMealIds = new Set(
+    meals.flatMap((meal) => meal.items.map((item) => item.food_item_id)),
   );
   const loggedMealNames = new Set(meals.flatMap((m) => m.items.map((i) => i.name)));
   const favoriteExercises = favoriteExerciseIds
@@ -198,7 +211,7 @@ export default function DashboardPage() {
           </Avatar>
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              {new Date().toLocaleDateString(undefined, {
+              {new Date().toLocaleDateString(language === "es" ? "es-MX" : undefined, {
                 weekday: "long",
                 month: "short",
                 day: "numeric",
@@ -207,11 +220,53 @@ export default function DashboardPage() {
             <h1 className="font-heading text-2xl font-extrabold">Hi, {firstName}</h1>
           </div>
         </div>
-        <div className="flex items-center gap-1.5 rounded-full border border-[var(--rosso)]/25 bg-[var(--rosso)]/12 px-3 py-1.5 text-sm text-[var(--rosso-light)]">
-          <Flame className="size-4" />
-          <span className="font-bold">{streaks.current_streak}</span>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 rounded-full border border-[var(--rosso)]/25 bg-[var(--rosso)]/12 px-3 py-1.5 text-sm text-[var(--rosso-light)]">
+            <Flame className="size-4" />
+            <span className="font-bold">{streaks.current_streak}</span>
+          </div>
+          {profile.sex === "male" && (
+            <button
+              type="button"
+              disabled={noMasturbationLoggedToday}
+              onClick={() => setConfirmNoFapOpen(true)}
+              className="flex items-center gap-1.5 rounded-full border border-cyan-300/25 bg-cyan-300/10 px-3 py-1.5 text-sm text-cyan-100 disabled:opacity-70"
+              aria-label={t(language, "Log no-fap streak day")}
+            >
+              <Banana className="size-4" />
+              <span className="font-bold">{noMasturbationStreaks.current_streak}</span>
+            </button>
+          )}
         </div>
       </div>
+
+      <Dialog open={confirmNoFapOpen} onOpenChange={setConfirmNoFapOpen}>
+        <DialogContent className="rounded-[1.6rem] border-white/10 bg-[#111]">
+          <DialogHeader>
+            <DialogTitle>{t(language, "Did you really not masturbate today?")}</DialogTitle>
+            <DialogDescription>
+              {t(language, "Be honest. This only counts if you made it through today.")}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant="outline" onClick={() => setConfirmNoFapOpen(false)}>
+              {t(language, "Not today")}
+            </Button>
+            <Button
+              className="bg-[var(--rosso)] text-white hover:bg-[var(--rosso)]/90"
+              onClick={() => {
+                logNoMasturbationDay();
+                setConfirmNoFapOpen(false);
+                toast.success(t(language, "No-fap streak logged"), {
+                  description: t(language, "Challenge day registered."),
+                });
+              }}
+            >
+              {t(language, "Yes, log it")}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* hero stats card with ring */}
       <div className="dashboard-item">
@@ -301,7 +356,7 @@ export default function DashboardPage() {
         </div>
         <div className="flex gap-2 overflow-x-auto pb-1">
           {currentMealOptions.options.map((m) => {
-            const isLogged = loggedMealNames.has(m.name);
+              const isLogged = loggedMealIds.has(m.id) || loggedMealNames.has(m.name);
             return (
               <button
                 key={m.id}
@@ -421,9 +476,12 @@ export default function DashboardPage() {
             Open squad
           </Link>
         </div>
-        {squadSnapshot && squadSnapshot.members.length > 0 ? (
+        {squadSnapshot &&
+        squadSnapshot.members.some((member) => member.user_id !== user?.id) ? (
           <div className="flex gap-2 overflow-x-auto pb-1">
-            {squadSnapshot.members.map((member) => {
+            {squadSnapshot.members
+              .filter((member) => member.user_id !== user?.id)
+              .map((member) => {
               const latestActivity = [...squadSnapshot.activity]
                 .filter((activity) => activity.user_id === member.user_id)
                 .sort((a, b) => b.date.localeCompare(a.date))[0];
@@ -441,10 +499,24 @@ export default function DashboardPage() {
                       {member.display_name.slice(0, 2).toUpperCase()}
                     </div>
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-bold">{member.display_name}</p>
+                      <p className="truncate text-sm font-bold">
+                        <span
+                          className={
+                            "mr-1.5 inline-block size-2 rounded-full align-middle " +
+                            (isSquadMemberOnline(member.last_seen_at)
+                              ? "bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.75)]"
+                              : "bg-zinc-500")
+                          }
+                        />
+                        {member.display_name}
+                      </p>
                       <p className="flex items-center gap-1 text-[11px] text-[var(--rosso-light)]">
                         <Flame className="size-3" />
                         {latestActivity?.streak ?? 0} streak
+                      </p>
+                      <p className="flex items-center gap-1 text-[11px] text-cyan-200">
+                        <Banana className="size-3" />
+                        {latestActivity?.no_masturbation_streak ?? 0} no-fap
                       </p>
                     </div>
                   </div>
@@ -721,4 +793,9 @@ function SquadMiniStat({
       <p>{label}</p>
     </div>
   );
+}
+
+function isSquadMemberOnline(lastSeenAt?: string | null) {
+  if (!lastSeenAt) return false;
+  return Date.now() - new Date(lastSeenAt).getTime() < 2 * 60 * 1000;
 }

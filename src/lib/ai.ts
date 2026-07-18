@@ -128,10 +128,14 @@ function assertFoodResult(value: unknown): AIFoodResult {
 
 /* ============ Food breakdown ============ */
 
-export async function aiFoodBreakdown(text: string): Promise<AIFoodResult> {
+export async function aiFoodBreakdown(
+  text: string,
+  language: "en" | "es" = "en",
+): Promise<AIFoodResult> {
   const prompt = `You are a nutrition expert. Break down this food description into ingredients with macro estimates.
 Return ONLY valid JSON (no markdown, no code fences) matching this TypeScript type:
 { ingredients: { name: string; quantity: number; unit: string; kcal: number; protein_g: number; fat_g: number; carb_g: number }[]; total_kcal: number; total_protein_g: number; total_fat_g: number; total_carb_g: number; summary: string }
+Return ingredient names, units, and summary in ${language === "es" ? "Spanish" : "English"}.
 
 Food description: "${text}"`;
 

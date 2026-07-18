@@ -15,6 +15,8 @@ import {
   passwordRules,
   passwordSchema,
 } from "@/lib/auth-validation";
+import { t } from "@/lib/i18n";
+import { useStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,6 +47,7 @@ type VerificationValues = z.infer<typeof verificationSchema>;
 
 export default function SignupPage() {
   const { signUp, verifyEmailCode } = useAuth();
+  const language = useStore((s) => s.language);
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
@@ -76,13 +79,13 @@ export default function SignupPage() {
       );
       if (needsEmailConfirmation) {
         setPendingEmail(values.email);
-        toast.success("Verification code sent");
+        toast.success(t(language, "Verification code sent"));
         return;
       }
-      toast.success("Account created");
+      toast.success(t(language, "Account created"));
       router.replace("/onboarding");
     } catch (err) {
-      const message = authErrorMessage(err, "Sign up failed.");
+      const message = t(language, authErrorMessage(err, "Sign up failed."));
       setFormError(message);
       toast.error(message);
     }
@@ -94,10 +97,10 @@ export default function SignupPage() {
 
     try {
       await verifyEmailCode(pendingEmail, values.code.trim());
-      toast.success("Email verified");
+      toast.success(t(language, "Email verified"));
       router.replace("/onboarding");
     } catch (err) {
-      const message = authErrorMessage(err, "Verification failed.");
+      const message = t(language, authErrorMessage(err, "Verification failed."));
       setFormError(message);
       toast.error(message);
     }
@@ -107,12 +110,12 @@ export default function SignupPage() {
     <Card className="premium-panel rounded-[1.7rem]">
       <CardHeader>
         <CardTitle className="font-heading">
-          {pendingEmail ? "Verify email" : "Create account"}
+          {t(language, pendingEmail ? "Verify email" : "Create account")}
         </CardTitle>
         <CardDescription>
           {pendingEmail
-            ? `Enter the verification code sent to ${pendingEmail}.`
-            : "Use a real email and a strong password."}
+            ? `${language === "es" ? "Ingresa el codigo de verificacion enviado a" : "Enter the verification code sent to"} ${pendingEmail}.`
+            : t(language, "Use a real email and a strong password.")}
         </CardDescription>
       </CardHeader>
       {pendingEmail ? (
@@ -124,7 +127,7 @@ export default function SignupPage() {
               </div>
             )}
             <div className="space-y-2">
-              <Label htmlFor="code">Verification code</Label>
+              <Label htmlFor="code">{t(language, "Verification code")}</Label>
               <Input
                 id="code"
                 inputMode="numeric"
@@ -147,7 +150,7 @@ export default function SignupPage() {
                 className="w-full bg-[var(--rosso)] font-semibold text-white hover:bg-[var(--rosso)]/90"
                 disabled={isVerifying}
               >
-                {isVerifying ? "Verifying…" : "Verify and continue"}
+                {isVerifying ? t(language, "Verifying…") : t(language, "Verify and continue")}
               </Button>
             </div>
             <button
@@ -158,7 +161,7 @@ export default function SignupPage() {
                 setFormError(null);
               }}
             >
-              Use a different email
+              {t(language, "Use a different email")}
             </button>
           </CardFooter>
         </form>
@@ -171,14 +174,14 @@ export default function SignupPage() {
             </div>
           )}
           <div className="space-y-2">
-            <Label htmlFor="name">Name</Label>
+            <Label htmlFor="name">{t(language, "Name")}</Label>
             <Input id="name" autoComplete="name" placeholder="Dani" {...register("name")} />
             {errors.name && (
               <p className="text-sm text-[var(--over)]">{errors.name.message}</p>
             )}
           </div>
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">{t(language, "Email")}</Label>
             <Input
               id="email"
               type="email"
@@ -191,7 +194,7 @@ export default function SignupPage() {
             )}
           </div>
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">{t(language, "Password")}</Label>
             <div className="relative">
               <Input
                 id="password"
@@ -202,14 +205,14 @@ export default function SignupPage() {
               />
               <button
                 type="button"
-                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-label={t(language, showPassword ? "Hide password" : "Show password")}
                 className="absolute inset-y-0 right-2 flex w-9 items-center justify-center rounded-full text-muted-foreground transition hover:bg-white/10 hover:text-foreground"
                 onClick={() => setShowPassword((visible) => !visible)}
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
-            <p className="text-xs text-muted-foreground">{passwordRules}</p>
+            <p className="text-xs text-muted-foreground">{t(language, passwordRules)}</p>
             {errors.password && (
               <p className="text-sm text-[var(--over)]">
                 {errors.password.message}
@@ -224,16 +227,16 @@ export default function SignupPage() {
               className="w-full bg-[var(--rosso)] font-semibold text-white hover:bg-[var(--rosso)]/90"
               disabled={isSubmitting}
             >
-              {isSubmitting ? "Lighting the spark…" : "Get started"}
+              {isSubmitting ? t(language, "Lighting the spark…") : t(language, "Get started")}
             </Button>
           </div>
           <p className="text-sm text-muted-foreground">
-            Already in?{" "}
+            {t(language, "Already in?")}{" "}
             <Link
               href="/login"
               className="font-medium text-[var(--rosso-light)] underline-offset-4 hover:underline"
             >
-              Log in
+              {t(language, "Log in")}
             </Link>
           </p>
         </CardFooter>

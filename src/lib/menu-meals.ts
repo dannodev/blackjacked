@@ -15,6 +15,185 @@ export interface MenuMealPreset {
 }
 
 export type MenuMealOption = MenuMealPreset;
+type MenuLanguage = "en" | "es";
+
+const MEAL_SLOT_ES: Record<string, string> = {
+  Breakfast: "Desayuno",
+  Lunch: "Comida",
+  Dinner: "Cena",
+  Snack: "Snack",
+  "AM snack": "Snack AM",
+  "PM snack": "Snack PM",
+};
+
+const DAY_ES: Record<string, string> = {
+  Sunday: "Domingo",
+  Monday: "Lunes",
+  Tuesday: "Martes",
+  Wednesday: "Miércoles",
+  Thursday: "Jueves",
+  Friday: "Viernes",
+  Saturday: "Sábado",
+  Custom: "Personalizado",
+};
+
+const MENU_MEAL_PRESET_ES: Record<string, Pick<MenuMealPreset, "name" | "description">> = {
+  "mon-breakfast": {
+    name: "Avena con manzana y canela",
+    description: "40 g de avena cocida en agua, 170 g de yogur griego natural y 1/2 manzana.",
+  },
+  "mon-snack1": {
+    name: "Pepino y jícama",
+    description: "Pepino y jícama con limón y chile.",
+  },
+  "mon-lunch": {
+    name: "Pollo al ajo y limón",
+    description: "180 g de pollo, calabacita/jitomate/cebolla y 1/2 taza de arroz integral.",
+  },
+  "mon-snack2": {
+    name: "Manzana",
+    description: "1 manzana mediana.",
+  },
+  "mon-dinner": {
+    name: "Tostadas de atún",
+    description: "1 lata de atún, 3 tostadas horneadas, lechuga, pico de gallo y salsa de yogur con limón.",
+  },
+  "tue-breakfast": {
+    name: "Huevos a la mexicana",
+    description: "2 huevos con jitomate, cebolla, salsa y 2 tortillas de maíz.",
+  },
+  "tue-snack1": {
+    name: "Plátano",
+    description: "1 plátano mediano.",
+  },
+  "tue-lunch": {
+    name: "Bowl de pollo y frijoles",
+    description: "150 g de pollo, 1/2 taza de frijoles, lechuga, pepino, jitomate, salsa y 2 tortillas.",
+  },
+  "tue-snack2": {
+    name: "Yogur griego",
+    description: "170 g de yogur griego natural.",
+  },
+  "tue-dinner": {
+    name: "Sopa rápida de pollo",
+    description: "160 g de pollo, 300 g de verduras congeladas, ajo, cebolla, limón y 1 papa chica.",
+  },
+  "wed-breakfast": {
+    name: "Bowl de yogur",
+    description: "200 g de yogur griego, 30 g de avena, 1/2 manzana y canela.",
+  },
+  "wed-snack1": {
+    name: "Pepino y jícama",
+    description: "Pepino y jícama con limón.",
+  },
+  "wed-lunch": {
+    name: "Tacos de pollo",
+    description: "160 g de pollo deshebrado, lechuga, salsa, cebolla y 3 tortillas de maíz.",
+  },
+  "wed-snack2": {
+    name: "Huevo cocido",
+    description: "1 huevo cocido.",
+  },
+  "wed-dinner": {
+    name: "Ensalada de atún y frijoles",
+    description: "1 lata de atún, 1/2 taza de frijoles, pepino, jitomate, cebolla, limón y 2 tostadas horneadas.",
+  },
+  "thu-breakfast": {
+    name: "Huevos con espinaca",
+    description: "2 huevos con espinaca, 2 tortillas y salsa.",
+  },
+  "thu-snack1": {
+    name: "Manzana",
+    description: "1 manzana mediana.",
+  },
+  "thu-lunch": {
+    name: "Bowl de pollo, arroz y frijoles",
+    description: "170 g de pollo, 1/2 taza de arroz, 1/2 taza de frijoles, lechuga, salsa y pepino.",
+  },
+  "thu-snack2": {
+    name: "Yogur griego",
+    description: "170 g de yogur griego natural.",
+  },
+  "thu-dinner": {
+    name: "Tostadas de pollo deshebrado",
+    description: "150 g de pollo, 3 tostadas horneadas, lechuga, pico de gallo y limón.",
+  },
+  "fri-breakfast": {
+    name: "Avena nocturna",
+    description: "40 g de avena, 150 g de yogur, canela, 1/2 manzana y un chorrito de leche.",
+  },
+  "fri-snack1": {
+    name: "Plátano",
+    description: "1 plátano mediano.",
+  },
+  "fri-lunch": {
+    name: "Tacos de pollo",
+    description: "160 g de pollo deshebrado, lechuga, salsa, cebolla y 3 tortillas de maíz.",
+  },
+  "fri-snack2": {
+    name: "Huevo cocido",
+    description: "1 huevo cocido.",
+  },
+  "fri-dinner": {
+    name: "Ensalada de atún y frijoles",
+    description: "1 lata de atún, 1/2 taza de frijoles, pepino, jitomate, cebolla, limón y 2 tostadas horneadas.",
+  },
+  "sat-breakfast": {
+    name: "Yogur con avena y fruta",
+    description: "200 g de yogur, 30 g de avena y 1 plátano chico o 1/2 manzana.",
+  },
+  "sat-snack1": {
+    name: "Palomitas naturales",
+    description: "3 tazas de palomitas hechas con aire, sin mantequilla.",
+  },
+  "sat-lunch": {
+    name: "Sartén de pollo con verduras",
+    description: "180 g de pollo, mezcla California congelada, ajo, limón y 1 papa mediana.",
+  },
+  "sat-snack2": {
+    name: "Pepino y jícama",
+    description: "Pepino y jícama con limón.",
+  },
+  "sat-dinner": {
+    name: "Cena de huevo y frijoles",
+    description: "2 huevos, 1/2 taza de frijoles, salsa, 2 tortillas y ensalada.",
+  },
+  "sun-breakfast": {
+    name: "Huevos con espinaca",
+    description: "2 huevos con espinaca, cebolla, salsa y 2 tortillas.",
+  },
+  "sun-snack1": {
+    name: "Manzana",
+    description: "1 manzana mediana.",
+  },
+  "sun-lunch": {
+    name: "Bowl de pollo, arroz y frijoles",
+    description: "170 g de pollo, 1/2 taza de arroz, 1/2 taza de frijoles, lechuga, salsa y pepino.",
+  },
+  "sun-snack2": {
+    name: "Yogur griego",
+    description: "170 g de yogur griego natural.",
+  },
+  "sun-dinner": {
+    name: "Tostadas de pollo deshebrado con panela",
+    description: "150 g de pollo, 3 tostadas horneadas, lechuga, pico de gallo, limón y 30 g de queso panela.",
+  },
+};
+
+export function localizeMenuMeal(
+  meal: MenuMealPreset,
+  language: MenuLanguage,
+): MenuMealPreset {
+  if (language !== "es") return meal;
+  const translated = MENU_MEAL_PRESET_ES[meal.id];
+  return {
+    ...meal,
+    name: translated?.name ?? meal.name,
+    description: translated?.description ?? meal.description,
+    day: DAY_ES[meal.day] ?? meal.day,
+    meal_slot: MEAL_SLOT_ES[meal.meal_slot] ?? meal.meal_slot,
+  };
+}
 
 export const MENU_MEAL_PRESETS: MenuMealPreset[] = [
   // Monday
@@ -310,6 +489,7 @@ const DAYS_OF_WEEK = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "F
 
 type MealWindow = {
   key: keyof MealSchedule;
+  type: MealType;
   label: string;
   slot: string;
   fallbackTime: string;
@@ -320,6 +500,7 @@ type MealWindow = {
 const MEAL_WINDOWS: MealWindow[] = [
   {
     key: "breakfast_time",
+    type: "breakfast",
     label: "Breakfast",
     slot: "Breakfast",
     fallbackTime: "07:30",
@@ -328,6 +509,7 @@ const MEAL_WINDOWS: MealWindow[] = [
   },
   {
     key: "am_snack_time",
+    type: "snack",
     label: "AM snack",
     slot: "AM snack",
     fallbackTime: "10:30",
@@ -336,6 +518,7 @@ const MEAL_WINDOWS: MealWindow[] = [
   },
   {
     key: "lunch_time",
+    type: "lunch",
     label: "Lunch",
     slot: "Lunch",
     fallbackTime: "13:30",
@@ -344,6 +527,7 @@ const MEAL_WINDOWS: MealWindow[] = [
   },
   {
     key: "pm_snack_time",
+    type: "snack",
     label: "PM snack",
     slot: "PM snack",
     fallbackTime: "16:30",
@@ -352,6 +536,7 @@ const MEAL_WINDOWS: MealWindow[] = [
   },
   {
     key: "dinner_time",
+    type: "dinner",
     label: "Dinner",
     slot: "Dinner",
     fallbackTime: "20:00",
@@ -395,15 +580,18 @@ export function getActiveMealWindow(
   }, windows[0]);
 }
 
-export function getTodayMeals(): MenuMealPreset[] {
+export function getTodayMeals(language: MenuLanguage = "en"): MenuMealPreset[] {
   const today = DAYS_OF_WEEK[new Date().getDay()];
-  return MENU_MEAL_PRESETS.filter((m) => m.day === today);
+  return MENU_MEAL_PRESETS
+    .filter((m) => m.day === today)
+    .map((meal) => localizeMenuMeal(meal, language));
 }
 
 export function getCurrentMealOptions(
   schedule?: MealSchedule,
   at = new Date(),
   meals = MENU_MEAL_PRESETS,
+  language: MenuLanguage = "en",
 ): {
   label: string;
   time: string;
@@ -411,9 +599,11 @@ export function getCurrentMealOptions(
 } {
   const active = getActiveMealWindow(schedule, at);
   return {
-    label: active.label,
+    label: language === "es" ? MEAL_SLOT_ES[active.label] ?? active.label : active.label,
     time: active.time,
-    options: meals.filter((meal) => meal.meal_slot === active.slot),
+    options: meals
+      .filter((meal) => meal.type === active.type || meal.meal_slot === active.slot)
+      .map((meal) => localizeMenuMeal(meal, language)),
   };
 }
 

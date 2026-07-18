@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { aiFoodBreakdown, type AIFoodResult } from "@/lib/ai";
 import { useCloudMeals } from "@/lib/use-cloud-meals";
+import { useStore } from "@/lib/store";
+import { t } from "@/lib/i18n";
 import { makeId } from "@/lib/id";
 import type { Meal, MealItem, MealType } from "@/lib/types";
 import { MEAL_LABELS } from "@/lib/types";
@@ -22,6 +24,7 @@ const MEAL_TYPES: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
 
 export function AiFoodLog() {
   const { addMeal } = useCloudMeals();
+  const language = useStore((s) => s.language);
   const [text, setText] = useState("");
   const [mealType, setMealType] = useState<MealType>("lunch");
   const [loading, setLoading] = useState(false);
@@ -29,16 +32,16 @@ export function AiFoodLog() {
 
   async function analyze() {
     if (!text.trim()) {
-      toast.error("Describe your food first");
+      toast.error(t(language, "Describe your food first"));
       return;
     }
     setLoading(true);
     setResult(null);
     try {
-      const r = await aiFoodBreakdown(text);
+      const r = await aiFoodBreakdown(text, language);
       setResult(r);
     } catch {
-      toast.error("AI failed. Try again.");
+      toast.error(t(language, "AI failed. Try again."));
     } finally {
       setLoading(false);
     }
@@ -67,7 +70,7 @@ export function AiFoodLog() {
       items,
     };
     await addMeal(meal);
-    toast.success(`${MEAL_LABELS[mealType]} logged`, {
+    toast.success(`${t(language, MEAL_LABELS[mealType])} ${language === "es" ? "registrada" : "logged"}`, {
       description: `${result.total_kcal} kcal · ${result.summary}`,
     });
     setResult(null);
@@ -98,12 +101,16 @@ export function AiFoodLog() {
         <CardContent className="space-y-3 py-4">
           <div className="flex items-center gap-2 text-sm text-[var(--rosso-light)]">
             <Sparkles className="size-4" />
-            <span className="font-medium">Describe your meal in plain words</span>
+            <span className="font-medium">{t(language, "Describe your meal in plain words")}</span>
           </div>
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="e.g. 2 eggs with spinach and 2 tortillas, plus a banana"
+            placeholder={
+              language === "es"
+                ? "ej. 2 huevos con espinaca y 2 tortillas, mas un platano"
+                : "e.g. 2 eggs with spinach and 2 tortillas, plus a banana"
+            }
             className="min-h-24 w-full resize-none rounded-2xl border border-white/10 bg-white/[0.045] px-3.5 py-3 text-sm outline-none focus:border-[var(--rosso)]"
           />
           <Button
@@ -114,12 +121,12 @@ export function AiFoodLog() {
             {loading ? (
               <>
                 <Loader2 className="mr-2 size-4 animate-spin" />
-                Analyzing…
+                {t(language, "Analyzing…")}
               </>
             ) : (
               <>
                 <Sparkles className="mr-2 size-4" />
-                Analyze macros
+                {t(language, "Analyze macros")}
               </>
             )}
           </Button>
@@ -136,7 +143,7 @@ export function AiFoodLog() {
             <Card className="carbon-card rounded-[1.6rem] border-white/7">
               <CardHeader>
                 <CardTitle className="font-heading flex items-center justify-between text-base">
-                  <span>Confirm before saving</span>
+                  <span>{t(language, "Confirm before saving")}</span>
                   <span className="font-heading text-xl font-bold text-[var(--rosso-light)]">
                     {result.total_kcal} kcal
                   </span>
@@ -145,8 +152,8 @@ export function AiFoodLog() {
               <CardContent className="space-y-2">
                 <p className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-muted-foreground">
                   {result.source === "gemini"
-                    ? `Gemini estimate${result.model ? ` · ${result.model}` : ""}`
-                    : "Backup estimate · Gemini was unavailable"}
+                    ? `${t(language, "Gemini estimate")}${result.model ? ` · ${result.model}` : ""}`
+                    : t(language, "Backup estimate · Gemini was unavailable")}
                 </p>
                 {result.ingredients.map((ing, i) => (
                   <div
@@ -167,14 +174,14 @@ export function AiFoodLog() {
                     onClick={() => setResult(null)}
                   >
                     <X className="mr-1 size-4" />
-                    Discard
+                    {t(language, "Discard")}
                   </Button>
                   <Button
                     className="flex-1 bg-[var(--rosso)] font-semibold text-white hover:bg-[var(--rosso)]/90"
                     onClick={confirm}
                   >
                     <Check className="mr-1 size-4" />
-                    Confirm & log
+                    {t(language, "Confirm & log")}
                   </Button>
                 </div>
               </CardContent>
