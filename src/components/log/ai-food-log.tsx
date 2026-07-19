@@ -17,7 +17,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Sparkles, Check, X, Loader2 } from "lucide-react";
+import { Camera, Sparkles, Check, X, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const MEAL_TYPES: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
@@ -29,16 +29,17 @@ export function AiFoodLog() {
   const [mealType, setMealType] = useState<MealType>("lunch");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AIFoodResult | null>(null);
+  const [photo, setPhoto] = useState<File | null>(null);
 
   async function analyze() {
-    if (!text.trim()) {
+    if (!text.trim() && !photo) {
       toast.error(t(language, "Describe your food first"));
       return;
     }
     setLoading(true);
     setResult(null);
     try {
-      const r = await aiFoodBreakdown(text, language);
+      const r = photo ? await analyzePhoto(photo, text, language) : await aiFoodBreakdown(text, language);
       setResult(r);
     } catch {
       toast.error(t(language, "AI failed. Try again."));
@@ -75,6 +76,7 @@ export function AiFoodLog() {
     });
     setResult(null);
     setText("");
+    setPhoto(null);
   }
 
   return (
@@ -104,6 +106,7 @@ export function AiFoodLog() {
             <span className="font-medium">{t(language, "Describe your meal in plain words")}</span>
           </div>
           <textarea
+            aria-label={t(language, "Meal description for macro estimate")}
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder={
@@ -113,6 +116,10 @@ export function AiFoodLog() {
             }
             className="min-h-24 w-full resize-none rounded-2xl border border-white/10 bg-white/[0.045] px-3.5 py-3 text-sm outline-none focus:border-[var(--rosso)]"
           />
+          <label className="flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-white/15 text-sm text-muted-foreground hover:border-[var(--rosso)]/40">
+            <Camera className="size-4" />{photo ? photo.name : "Add meal photo (optional)"}
+            <input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setPhoto(event.target.files?.[0] ?? null)} />
+          </label>
           <Button
             onClick={analyze}
             disabled={loading}
@@ -130,6 +137,9 @@ export function AiFoodLog() {
               </>
             )}
           </Button>
+          <p className="text-xs leading-5 text-muted-foreground">
+            Optional AI analysis sends this description to Google Gemini. Avoid medical or sensitive personal details. <a href="/privacy" className="underline">Learn more</a>.
+          </p>
         </CardContent>
       </Card>
 
@@ -154,6 +164,9 @@ export function AiFoodLog() {
                   {result.source === "gemini"
                     ? `${t(language, "Gemini estimate")}${result.model ? ` · ${result.model}` : ""}`
                     : t(language, "Backup estimate · Gemini was unavailable")}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Nutrition values are estimates. Review portions and edit with manual logging when accuracy matters.
                 </p>
                 {result.ingredients.map((ing, i) => (
                   <div
@@ -191,4 +204,15 @@ export function AiFoodLog() {
       </AnimatePresence>
     </div>
   );
+}
+
+async function analyzePhoto(file: File, description: string, language: "en" | "es"): Promise<AIFoodResult> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("description", description);
+  form.append("language", language);
+  const response = await fetch("/api/ai/food-photo", { method: "POST", body: form });
+  const payload = await response.json() as { data?: AIFoodResult; model?: string; error?: string };
+  if (!response.ok || !payload.data) throw new Error(payload.error ?? "Photo analysis failed");
+  return { ...payload.data, source: "gemini", model: payload.model };
 }

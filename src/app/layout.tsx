@@ -19,7 +19,7 @@ const fontHeading = Sora({
 
 export const metadata: Metadata = {
   title: "BlackJacked",
-  description: "Burn the deficit. Track every kcal in and out.",
+  description: "Adaptive nutrition, training, progress, and small-squad accountability.",
   applicationName: "BlackJacked",
   appleWebApp: {
     capable: true,
@@ -38,8 +38,6 @@ export const viewport: Viewport = {
   themeColor: "#080808",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
   viewportFit: "cover",
 };
 

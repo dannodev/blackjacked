@@ -5,6 +5,7 @@ import {
   type ResponseSchema,
 } from "@google/generative-ai";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { z } from "zod";
 
 const MODELS = ["gemini-3.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-flash"] as const;
 const MAX_FILE_BYTES = 8 * 1024 * 1024;
@@ -16,6 +17,20 @@ const ACCEPTED_MIME_TYPES = new Set([
   "image/webp",
   "text/plain",
 ]);
+
+const importedMenuSchema = z.object({
+  meals: z.array(z.object({
+    name: z.string().trim().min(1).max(120),
+    description: z.string().max(1000),
+    type: z.enum(["breakfast", "lunch", "dinner", "snack"]),
+    kcal: z.number().finite().min(0).max(5000),
+    protein_g: z.number().finite().min(0).max(500),
+    carb_g: z.number().finite().min(0).max(1000),
+    fat_g: z.number().finite().min(0).max(500),
+    meal_slot: z.string().max(80),
+    emoji: z.string().max(16),
+  })).max(80),
+});
 
 const menuImportSchema: ResponseSchema = {
   type: SchemaType.OBJECT,
@@ -116,6 +131,13 @@ export async function POST(request: Request) {
     }
   }
 
+  const { data: allowed, error: quotaError } = await supabase.rpc("consume_ai_quota", {
+    daily_limit: 30,
+  });
+  if (quotaError || !allowed) {
+    return NextResponse.json({ error: "Daily AI limit reached." }, { status: 429 });
+  }
+
   const prompt = `Extract meals from this user menu and return clean structured JSON.
 Rules:
 - Return every clear meal option you can find.
@@ -154,12 +176,19 @@ ${menuText ? `\nPasted menu text:\n${menuText}` : ""}`;
           filePart ? [{ text: prompt }, filePart] : prompt,
         );
         const text = result.response.text();
-        const parsed = JSON.parse(text) as unknown;
+        const parsed = importedMenuSchema.safeParse(JSON.parse(text));
+        if (!parsed.success) {
+          lastError = new Error(`${modelName} returned invalid menu values.`);
+          continue;
+        }
+
+        const tokens = result.response.usageMetadata?.totalTokenCount ?? 0;
+        void supabase.rpc("record_ai_tokens", { tokens_used: tokens });
 
         return NextResponse.json({
-          data: parsed,
+          data: parsed.data,
           model: modelName,
-          tokens: result.response.usageMetadata?.totalTokenCount ?? 0,
+          tokens,
         });
       } catch (error) {
         lastError = error;

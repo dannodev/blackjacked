@@ -9,7 +9,7 @@
 BlackJacked is designed around the habits that actually move fitness forward. Instead of juggling a calorie tracker, workout log, progress gallery, and group chat, users get one private home for their entire journey.
 
 - **Know what to eat** — Track meals and macros, plan around personal calorie goals, and use AI-assisted nutrition tools when speed matters.
-- **Train with purpose** — Log workouts and see daily activity alongside nutrition instead of treating them as separate goals.
+- **Train with purpose** — Track loads, reps, effort, weekly volume, and progressive-overload guidance alongside nutrition.
 - **See real progress** — Follow weight trends, measurements, check-in photos, streaks, and goal milestones over time.
 - **Stay accountable** — Create a squad, compare shared activity, celebrate streaks, and keep motivation alive through squad chat.
 - **Keep personal data personal** — Squads show only intentionally shared activity; sensitive body information remains private.
@@ -22,17 +22,20 @@ BlackJacked turns a complicated fitness routine into a simple rhythm: set a goal
 ## Product highlights
 
 - Personalized calorie and macro targets
-- Meal logging and menu planning
-- Workout and calorie-burn tracking
-- Weight, measurement, and photo check-ins
+- Adaptive Weekly Coach with small, explainable plan adjustments and up to five realtime-synced personal priorities
+- Recent meals, favorites, recipes, barcode lookup, menu planning, and optional AI photo logging
+- Workout loads, effort, previous performance, weekly volume, and progressive-overload suggestions
+- Private weight, measurement, and photo check-ins with expiring image links
 - Goal progress and habit streaks
-- Private squad challenges, presence, leaderboards, and chat
+- Private squads, presence, supportive chat, activity leaderboards, reporting controls, and new-message push notifications
+- Offline-safe meal and training changes with a durable retry queue
+- Account data export and permanent deletion
 - English and Spanish experiences
 - Installable, mobile-first progressive web app
 
 ## Technology
 
-BlackJacked is built with Next.js, React, TypeScript, Tailwind CSS, Supabase, and Cloudinary. Supabase powers authentication and synchronized app data, while Cloudinary securely manages optimized profile and progress imagery.
+BlackJacked is built with Next.js, React, TypeScript, Tailwind CSS, Supabase, Cloudinary, Google Gemini, and Open Food Facts. Supabase powers authentication, synchronized app data, and private progress-photo storage. Cloudinary manages public profile avatars.
 
 ## Development
 
@@ -52,3 +55,5 @@ npm run build
 ```
 
 Server credentials must remain server-only and must never use the `NEXT_PUBLIC_` prefix.
+
+Push reminders additionally require a VAPID key pair, `CRON_SECRET`, and the server-only Supabase service-role key. The committed Vercel cron calls the protected sender hourly; each subscription is sent at most once on its local calendar day.

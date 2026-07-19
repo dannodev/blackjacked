@@ -239,6 +239,9 @@ export default function SignupPage() {
               {t(language, "Log in")}
             </Link>
           </p>
+          <p className="text-center text-xs leading-5 text-muted-foreground">
+            By creating an account, you agree to the <Link href="/terms" className="underline">Terms</Link> and acknowledge the <Link href="/privacy" className="underline">Privacy Policy</Link>.
+          </p>
         </CardFooter>
       </form>
       )}

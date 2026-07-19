@@ -313,30 +313,15 @@ export async function joinRemoteSquad(inviteCode: string, displayName: string) {
   }
 
   const supabase = requireSupabase();
-  const userId = await getCurrentUserId();
   const cleanCode = inviteCode.trim().toUpperCase();
-  const { data: squad, error: squadError } = await supabase
-    .from("squads")
-    .select("id")
-    .eq("invite_code", cleanCode)
-    .maybeSingle();
-
-  if (squadError) throw squadError;
-  if (!squad?.id) throw new Error("Invalid squad code");
-
-  const colorIndex = randomBytes(1)[0] % SQUAD_COLORS.length;
-  const { error: memberError } = await supabase.from("squad_members").insert({
-    squad_id: squad.id,
-    user_id: userId,
-    display_name: displayName.trim() || "Racer",
-    avatar_url: null,
-    color: SQUAD_COLORS[colorIndex],
-    role: "member",
-    last_seen_at: new Date().toISOString(),
+  const { data: squadId, error } = await supabase.rpc("join_squad_by_code", {
+    invite_code_input: cleanCode,
+    display_name_input: displayName.trim() || "Racer",
   });
 
-  if (memberError) throw memberError;
-  return loadSquadById(squad.id);
+  if (error) throw error;
+  if (!squadId) throw new Error("Invalid squad code");
+  return loadSquadById(squadId as string);
 }
 
 export async function leaveRemoteSquad(squadId: string) {
@@ -348,6 +333,19 @@ export async function leaveRemoteSquad(squadId: string) {
 
   const supabase = requireSupabase();
   const userId = await getCurrentUserId();
+  const { data: squad, error: squadError } = await supabase
+    .from("squads")
+    .select("owner_id")
+    .eq("id", squadId)
+    .single();
+
+  if (squadError) throw squadError;
+  if (squad.owner_id === userId) {
+    const { error } = await supabase.from("squads").delete().eq("id", squadId);
+    if (error) throw error;
+    return;
+  }
+
   const { error } = await supabase
     .from("squad_members")
     .delete()
@@ -399,6 +397,26 @@ export async function touchMySquadPresence(squadId: string) {
     .eq("squad_id", squadId)
     .eq("user_id", userId);
 
+  if (error) throw error;
+}
+
+export async function updateMySquadMemberProfile(
+  squadId: string,
+  displayName: string,
+  avatarUrl: string | null,
+) {
+  if (canUseE2EAuthBypass()) return;
+  const supabase = requireSupabase();
+  const userId = await getCurrentUserId();
+  const { error } = await supabase
+    .from("squad_members")
+    .update({
+      display_name: displayName.trim() || "Racer",
+      avatar_url: avatarUrl,
+      last_seen_at: new Date().toISOString(),
+    })
+    .eq("squad_id", squadId)
+    .eq("user_id", userId);
   if (error) throw error;
 }
 
@@ -506,7 +524,25 @@ export async function sendSquadMessage(squadId: string, body: string) {
     .single();
 
   if (error) throw error;
+  void fetch("/api/notifications/squad-message", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ squadId, messageId: data.id }),
+  }).catch(() => undefined);
   return data as SquadMessageRow;
+}
+
+export async function reportSquadMessage(squadId: string, messageId: string, reason: string) {
+  if (canUseE2EAuthBypass()) return;
+  const supabase = requireSupabase();
+  const userId = await getCurrentUserId();
+  const { error } = await supabase.from("squad_message_reports").insert({
+    squad_id: squadId,
+    message_id: messageId,
+    reporter_id: userId,
+    reason: reason.trim().slice(0, 300),
+  });
+  if (error) throw error;
 }
 
 export async function deleteExpiredSquadMessages(squadId: string) {

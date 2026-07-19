@@ -9,6 +9,7 @@ import {
   ringState,
   ageFromBirthdate,
   sameDay,
+  recommendedCalorieTarget,
   type Profile,
   type Meal,
   type ExerciseLog,
@@ -140,7 +141,7 @@ describe("computeDay", () => {
     expect(day.f).toBe(35);
     expect(day.c).toBe(100);
   });
-  it("adds exercise burn to total_out", () => {
+  it("tracks exercise without double-counting it in total expenditure", () => {
     const exercises: ExerciseLog[] = [
       {
         id: "1",
@@ -155,7 +156,7 @@ describe("computeDay", () => {
     ];
     const day = computeDay([], exercises, baseProfile, at);
     expect(day.kcal_out_activity).toBe(392);
-    expect(day.total_out).toBeCloseTo(day.tdee_kcal + 392, 0);
+    expect(day.total_out).toBeCloseTo(day.tdee_kcal, 0);
   });
   it("goal_deficit = calorie_goal - kcal_in", () => {
     const meals: Meal[] = [
@@ -190,7 +191,7 @@ describe("computeDay", () => {
     const day = computeDay(meals, [], baseProfile, at);
     expect(day.real_deficit).toBeCloseTo(day.tdee_kcal - 2000, 0);
   });
-  it("real_deficit increases with exercise", () => {
+  it("does not increase estimated deficit when activity factor already includes exercise", () => {
     const noEx = computeDay(
       [{ id: "x", type: "lunch", loggedAt: "2025-07-14T12:00:00Z", total_kcal: 1500, p: 80, f: 40, c: 150, items: [] }],
       [],
@@ -203,7 +204,20 @@ describe("computeDay", () => {
       baseProfile,
       at,
     );
-    expect(withEx.real_deficit).toBeCloseTo(noEx.real_deficit + 392, 0);
+    expect(withEx.real_deficit).toBeCloseTo(noEx.real_deficit, 0);
+  });
+});
+
+describe("recommendedCalorieTarget", () => {
+  it("uses goal-aware adjustments", () => {
+    expect(recommendedCalorieTarget(2500, "lose", "male")).toBe(2150);
+    expect(recommendedCalorieTarget(2500, "maintain", "male")).toBe(2500);
+    expect(recommendedCalorieTarget(2500, "gain", "male")).toBe(2750);
+  });
+
+  it("enforces conservative minimums", () => {
+    expect(recommendedCalorieTarget(1300, "lose", "male")).toBe(1500);
+    expect(recommendedCalorieTarget(1200, "lose", "female")).toBe(1200);
   });
 });
 

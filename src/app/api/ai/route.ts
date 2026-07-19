@@ -5,10 +5,28 @@ import {
   type ResponseSchema,
 } from "@google/generative-ai";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { z } from "zod";
 
 const MODELS = ["gemini-3.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-flash"] as const;
 const MAX_PROMPT_CHARS = 12_000;
 const AI_ACTIONS = ["food", "menu", "exercise", "insight"] as const;
+
+const foodResultSchema = z.object({
+  ingredients: z.array(z.object({
+    name: z.string().trim().min(1).max(120),
+    quantity: z.number().finite().min(0).max(10000),
+    unit: z.string().trim().min(1).max(30),
+    kcal: z.number().finite().min(0).max(10000),
+    protein_g: z.number().finite().min(0).max(1000),
+    fat_g: z.number().finite().min(0).max(1000),
+    carb_g: z.number().finite().min(0).max(2000),
+  })).min(1).max(50),
+  total_kcal: z.number().finite().min(0).max(20000),
+  total_protein_g: z.number().finite().min(0).max(2000),
+  total_fat_g: z.number().finite().min(0).max(2000),
+  total_carb_g: z.number().finite().min(0).max(4000),
+  summary: z.string().trim().min(1).max(500),
+});
 
 type AiAction = (typeof AI_ACTIONS)[number];
 
@@ -109,6 +127,16 @@ export async function POST(request: Request) {
     );
   }
 
+  const { data: allowed, error: quotaError } = await supabase.rpc("consume_ai_quota", {
+    daily_limit: 30,
+  });
+  if (quotaError || !allowed) {
+    return NextResponse.json(
+      { error: "Daily AI limit reached. Manual logging is still available." },
+      { status: 429 },
+    );
+  }
+
   try {
     const client = new GoogleGenerativeAI(key);
     let lastError: unknown = null;
@@ -132,10 +160,17 @@ export async function POST(request: Request) {
           continue;
         }
 
+        const validated = body.action === "food" ? foodResultSchema.safeParse(data) : { success: true as const, data };
+        if (!validated.success) {
+          lastError = new Error(`${modelName} returned unsafe values.`);
+          continue;
+        }
+        const tokens = result.response.usageMetadata?.totalTokenCount ?? 0;
+        void supabase.rpc("record_ai_tokens", { tokens_used: tokens });
         return NextResponse.json({
-          data,
+          data: validated.data,
           model: modelName,
-          tokens: result.response.usageMetadata?.totalTokenCount ?? 0,
+          tokens,
         });
       } catch (error) {
         lastError = error;

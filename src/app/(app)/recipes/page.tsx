@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { useStore } from "@/lib/store";
 import { makeId } from "@/lib/id";
 import type { Recipe } from "@/lib/types";
+import { useCloudMeals } from "@/lib/use-cloud-meals";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,12 +16,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Plus, ChefHat, Trash2, X } from "lucide-react";
+import { Plus, ChefHat, ClipboardPlus, Trash2, X } from "lucide-react";
 
 export default function RecipesPage() {
   const recipes = useStore((s) => s.recipes);
   const addRecipe = useStore((s) => s.addRecipe);
   const deleteRecipe = useStore((s) => s.deleteRecipe);
+  const { addMeal } = useCloudMeals();
   const [showForm, setShowForm] = useState(false);
 
   return (
@@ -107,6 +109,10 @@ export default function RecipesPage() {
                       {r.instructions}
                     </p>
                   )}
+                  {r.kcal_per_serving ? <Button variant="outline" size="sm" className="mt-3 w-full" onClick={async () => {
+                    await addMeal({ id: makeId(), type: "lunch", loggedAt: new Date().toISOString(), total_kcal: r.kcal_per_serving ?? 0, p: r.protein_per_serving ?? 0, f: r.fat_per_serving ?? 0, c: r.carb_per_serving ?? 0, items: [{ food_item_id: r.id, name: r.name, quantity: 1, unit: "serving", kcal: r.kcal_per_serving ?? 0, protein_g: r.protein_per_serving ?? 0, fat_g: r.fat_per_serving ?? 0, carb_g: r.carb_per_serving ?? 0 }] });
+                    toast.success(`${r.name} logged`);
+                  }}><ClipboardPlus className="mr-1 size-4" />Log one serving · {r.kcal_per_serving} kcal</Button> : null}
                 </CardContent>
               </Card>
             </motion.div>
@@ -130,6 +136,7 @@ function RecipeForm({
   const [ingredients, setIngredients] = useState<
     { name: string; qty: number; unit: string }[]
   >([]);
+  const [nutrition, setNutrition] = useState({ kcal: 0, protein: 0, carbs: 0, fat: 0 });
 
   function addIngredient() {
     setIngredients([...ingredients, { name: "", qty: 100, unit: "g" }]);
@@ -164,6 +171,10 @@ function RecipeForm({
           qty: i.qty,
           unit: i.unit,
         })),
+      kcal_per_serving: nutrition.kcal || undefined,
+      protein_per_serving: nutrition.protein || undefined,
+      carb_per_serving: nutrition.carbs || undefined,
+      fat_per_serving: nutrition.fat || undefined,
       createdAt: new Date().toISOString(),
     };
     onSave(recipe);
@@ -203,18 +214,21 @@ function RecipeForm({
             {ingredients.map((ing, i) => (
               <div key={i} className="flex gap-1">
                 <Input
+                  aria-label={`Ingredient ${i + 1} name`}
                   placeholder="Ingredient"
                   value={ing.name}
                   onChange={(e) => updateIngredient(i, { name: e.target.value })}
                   className="flex-1"
                 />
                 <Input
+                  aria-label={`Ingredient ${i + 1} quantity`}
                   type="number"
                   value={ing.qty}
                   onChange={(e) => updateIngredient(i, { qty: +e.target.value })}
                   className="w-16"
                 />
                 <Input
+                  aria-label={`Ingredient ${i + 1} unit`}
                   value={ing.unit}
                   onChange={(e) => updateIngredient(i, { unit: e.target.value })}
                   className="w-14"
@@ -231,6 +245,13 @@ function RecipeForm({
             <Button variant="outline" size="sm" onClick={addIngredient}>
               <Plus className="mr-1 size-3" /> Add ingredient
             </Button>
+          </div>
+          <div className="space-y-2">
+            <Label>Nutrition per serving</Label>
+            <div className="grid grid-cols-4 gap-2">
+              {([['kcal', 'Kcal'], ['protein', 'Protein'], ['carbs', 'Carbs'], ['fat', 'Fat']] as const).map(([key, label]) => <div key={key} className="space-y-1"><Label htmlFor={`recipe-${key}`} className="text-[10px]">{label}</Label><Input id={`recipe-${key}`} type="number" min="0" value={nutrition[key] || ""} onChange={(event) => setNutrition((current) => ({ ...current, [key]: +event.target.value }))} /></div>)}
+            </div>
+            <p className="text-xs text-muted-foreground">Enter label values so the recipe can be logged in one tap.</p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="instructions">Instructions (optional)</Label>

@@ -21,7 +21,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Plus, Search, X, Utensils, Check } from "lucide-react";
+import { Barcode, Clock3, Copy, Loader2, Plus, Search, Star, X, Utensils, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const MEAL_TYPES: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
@@ -39,7 +39,42 @@ function inferMealType(): MealType {
 }
 
 export function FoodLog({ mode = "menu" }: { mode?: "menu" | "search" }) {
-  return mode === "menu" ? <MenuMealsLog /> : <SearchFoodsLog />;
+  return <div className="space-y-4">
+    <RecentMeals />
+    {mode === "menu" ? <MenuMealsLog /> : <SearchFoodsLog />}
+  </div>;
+}
+
+function RecentMeals() {
+  const meals = useStore((s) => s.meals);
+  const { addMeal } = useCloudMeals();
+  const recent = useMemo(() => {
+    const seen = new Set<string>();
+    return [...meals]
+      .sort((a, b) => +new Date(b.loggedAt) - +new Date(a.loggedAt))
+      .filter((meal) => {
+        const key = meal.items.map((item) => item.name.toLowerCase()).sort().join("|");
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, 6);
+  }, [meals]);
+  if (recent.length === 0) return null;
+
+  return <section aria-labelledby="recent-meals" className="space-y-2">
+    <div className="flex items-center gap-2"><Clock3 className="size-4 text-[var(--rosso-light)]" /><h2 id="recent-meals" className="font-heading text-sm font-bold">Recent meals</h2></div>
+    <div className="flex gap-2 overflow-x-auto pb-1">
+      {recent.map((meal) => <button key={meal.id} type="button" className="w-44 shrink-0 rounded-[1.2rem] border border-white/8 bg-white/[0.045] p-3 text-left" onClick={async () => {
+        await addMeal({ ...meal, id: makeId(), loggedAt: nowTime(), items: meal.items.map((item) => ({ ...item })) });
+        toast.success("Meal copied to today");
+      }}>
+        <span className="flex items-center gap-1 text-[10px] font-bold uppercase text-[var(--rosso-light)]"><Copy className="size-3" />Copy</span>
+        <span className="mt-1 block truncate text-sm font-semibold">{meal.items.map((item) => item.name).join(", ")}</span>
+        <span className="text-xs text-muted-foreground">{meal.total_kcal} kcal · {MEAL_LABELS[meal.type]}</span>
+      </button>)}
+    </div>
+  </section>;
 }
 
 /* ============ Menu Meals (from PDF) ============ */
@@ -202,9 +237,13 @@ function MenuMealsLog() {
 function SearchFoodsLog() {
   const foods = useAllFoods();
   const { addMeal } = useCloudMeals();
+  const favoriteFoodIds = useStore((s) => s.favoriteFoodIds);
+  const toggleFavoriteFood = useStore((s) => s.toggleFavoriteFood);
   const [query, setQuery] = useState("");
   const [mealType, setMealType] = useState<MealType>(inferMealType());
   const [cart, setCart] = useState<{ item: FoodItem; qty: number }[]>([]);
+  const [barcode, setBarcode] = useState("");
+  const [lookingUpBarcode, setLookingUpBarcode] = useState(false);
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -214,8 +253,8 @@ function SearchFoodsLog() {
         f.name.toLowerCase().includes(q) ||
         (f.brand && f.brand.toLowerCase().includes(q)),
     );
-    return list.slice(0, 30);
-  }, [foods, query]);
+    return list.sort((a, b) => Number(favoriteFoodIds.includes(b.id)) - Number(favoriteFoodIds.includes(a.id))).slice(0, 30);
+  }, [favoriteFoodIds, foods, query]);
 
   const cartTotals = useMemo(() => {
     return cart.reduce(
@@ -240,6 +279,24 @@ function SearchFoodsLog() {
         );
       return [...c, { item, qty: item.serving_size }];
     });
+  }
+
+  async function lookupBarcode() {
+    const code = barcode.replace(/\D/g, "");
+    if (code.length < 7) return toast.error("Enter the numbers below the barcode.");
+    try {
+      setLookingUpBarcode(true);
+      const response = await fetch(`/api/barcode/${code}`);
+      const result = await response.json() as { food?: FoodItem; source?: string; error?: string };
+      if (!response.ok || !result.food) throw new Error(result.error ?? "Product not found.");
+      add(result.food);
+      setBarcode("");
+      toast.success(`${result.food.name} added`, { description: result.source });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not look up barcode");
+    } finally {
+      setLookingUpBarcode(false);
+    }
   }
 
   function changeQty(id: string, qty: number) {
@@ -317,24 +374,31 @@ function SearchFoodsLog() {
         />
       </div>
 
+      <div className="flex gap-2">
+        <div className="relative flex-1"><Barcode className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input aria-label="Product barcode" inputMode="numeric" placeholder="Enter package barcode" value={barcode} onChange={(event) => setBarcode(event.target.value.replace(/\D/g, "").slice(0, 14))} onKeyDown={(event) => event.key === "Enter" && void lookupBarcode()} className="pl-9" /></div>
+        <Button type="button" variant="outline" disabled={lookingUpBarcode || barcode.length < 7} onClick={() => void lookupBarcode()}>{lookingUpBarcode ? <Loader2 className="size-4 animate-spin" /> : "Look up"}</Button>
+      </div>
+      <p className="text-[11px] text-muted-foreground">Package nutrition comes from Open Food Facts. Always compare it with the product label.</p>
+
       <div className="space-y-1.5">
         {results.map((f) => (
-          <button
+          <div
             key={f.id}
-            type="button"
-            onClick={() => add(f)}
             className="flex w-full items-center justify-between rounded-2xl border border-white/7 bg-white/[0.045] px-3 py-2.5 text-left transition-colors hover:bg-white/[0.075]"
           >
-            <div className="min-w-0">
+            <button type="button" onClick={() => add(f)} className="min-w-0 flex-1 text-left">
               <p className="truncate text-sm font-medium">{f.name}</p>
               <p className="text-xs text-muted-foreground">
                 {f.serving_size}
                 {f.serving_unit} · {f.kcal} kcal · P {f.protein_g} C {f.carb_g} F
                 {f.fat_g}
               </p>
-            </div>
-            <Plus className="size-4 text-[var(--rosso-light)]" />
-          </button>
+            </button>
+            <button type="button" aria-label={`${favoriteFoodIds.includes(f.id) ? "Remove" : "Add"} ${f.name} favorite`} onClick={() => toggleFavoriteFood(f.id)} className="flex size-9 items-center justify-center text-muted-foreground">
+              <Star className={favoriteFoodIds.includes(f.id) ? "size-4 fill-[var(--amber)] text-[var(--amber)]" : "size-4"} />
+            </button>
+            <button type="button" aria-label={`Add ${f.name}`} onClick={() => add(f)} className="flex size-9 items-center justify-center"><Plus className="size-4 text-[var(--rosso-light)]" /></button>
+          </div>
         ))}
           {results.length === 0 && (
             <p className="py-6 text-center text-sm text-muted-foreground">

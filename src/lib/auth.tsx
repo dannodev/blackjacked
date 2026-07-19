@@ -32,6 +32,8 @@ type AuthContextValue = AuthState & {
     password: string,
   ) => Promise<{ needsEmailConfirmation: boolean }>;
   verifyEmailCode: (email: string, code: string) => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  updatePassword: (password: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -230,6 +232,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [useSupabase],
   );
 
+  const requestPasswordReset = useCallback(async (email: string) => {
+    if (!useSupabase) throw new Error("Authentication is not configured for this build.");
+    const { error } = await getSupabaseBrowser().auth.resetPasswordForEmail(email, {
+      redirectTo: authRedirectTo("/reset-password"),
+    });
+    if (error) throw error;
+  }, [useSupabase]);
+
+  const updatePassword = useCallback(async (password: string) => {
+    if (!useSupabase) throw new Error("Authentication is not configured for this build.");
+    const { error } = await getSupabaseBrowser().auth.updateUser({ password });
+    if (error) throw error;
+  }, [useSupabase]);
+
   // ── Sign out ─────────────────────────────────────────
   const signOut = useCallback(async () => {
     if (canUseE2EAuthBypass()) {
@@ -245,8 +261,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [useSupabase]);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, loading, signIn, signUp, verifyEmailCode, signOut }),
-    [user, loading, signIn, signUp, verifyEmailCode, signOut],
+    () => ({ user, loading, signIn, signUp, verifyEmailCode, requestPasswordReset, updatePassword, signOut }),
+    [user, loading, signIn, signUp, verifyEmailCode, requestPasswordReset, updatePassword, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

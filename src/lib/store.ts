@@ -15,11 +15,15 @@ import type {
   Squad,
   SquadMember,
   DailySummary,
+  WorkoutRoutine,
 } from "./types";
 import { computeDay, normalizeGoal, sameDay, todayKey } from "./types";
 import { FOODS } from "./foods-seed";
 import { makeId } from "./id";
 import type { MenuMealPreset } from "./menu-meals";
+import type { CloudAppState } from "./supabase/app-state";
+import type { CoachFocusId } from "./supabase/coach-preferences";
+import { DEFAULT_COACH_FOCUS } from "./supabase/coach-preferences";
 
 const DB_KEY = "blackjacked-store-v1";
 
@@ -57,6 +61,9 @@ interface State {
   customFoods: FoodItem[];
   customMenuMeals: MenuMealPreset[];
   favoriteExerciseIds: string[];
+  favoriteFoodIds: string[];
+  workoutRoutines: WorkoutRoutine[];
+  coachFocusItems: CoachFocusId[];
   useDefaultMenu: boolean;
   dailySummaries: DailySummary[];
   streaks: Streaks;
@@ -78,8 +85,13 @@ interface State {
   addExerciseLog: (e: ExerciseLog) => void;
   deleteExerciseLog: (id: string) => void;
   toggleFavoriteExercise: (id: string) => void;
+  toggleFavoriteFood: (id: string) => void;
+  addWorkoutRoutine: (routine: WorkoutRoutine) => void;
+  deleteWorkoutRoutine: (id: string) => void;
+  setCoachFocusItems: (items: CoachFocusId[]) => void;
   setWeightLogs: (logs: WeightLog[]) => void;
   addWeightLog: (w: WeightLog) => void;
+  deleteWeightLog: (id: string) => void;
   addCustomFood: (f: FoodItem) => void;
   addCustomMenuMeal: (meal: MenuMealPreset) => void;
   deleteCustomMenuMeal: (id: string) => void;
@@ -100,6 +112,7 @@ interface State {
   removeSquadMember: (id: string) => void;
   leaveSquad: () => void;
   resetAll: () => void;
+  applyCloudAppState: (state: CloudAppState) => void;
 }
 
 function emptyStreaks(): Streaks {
@@ -162,6 +175,9 @@ export const useStore = create<State>()(
       customFoods: [],
       customMenuMeals: [],
       favoriteExerciseIds: [],
+      favoriteFoodIds: [],
+      workoutRoutines: [],
+      coachFocusItems: DEFAULT_COACH_FOCUS,
       useDefaultMenu: true,
       dailySummaries: [],
       streaks: emptyStreaks(),
@@ -184,14 +200,8 @@ export const useStore = create<State>()(
         get().refreshQualifiedStreak();
       },
 
-      setMeals: (meals) =>
-        {
-        set((s) => {
-          const localById = new Map(s.meals.map((meal) => [meal.id, meal]));
-          const mergedById = new Map(localById);
-          for (const meal of meals) mergedById.set(meal.id, meal);
-          return { meals: [...mergedById.values()] };
-        });
+      setMeals: (meals) => {
+        set({ meals });
         get().refreshQualifiedStreak();
       },
 
@@ -204,14 +214,8 @@ export const useStore = create<State>()(
         get().refreshQualifiedStreak();
       },
 
-      setExerciseLogs: (logs) =>
-        {
-        set((s) => {
-          const localById = new Map(s.exerciseLogs.map((log) => [log.id, log]));
-          const mergedById = new Map(localById);
-          for (const log of logs) mergedById.set(log.id, log);
-          return { exerciseLogs: [...mergedById.values()] };
-        });
+      setExerciseLogs: (logs) => {
+        set({ exerciseLogs: logs });
         get().refreshQualifiedStreak();
       },
 
@@ -229,6 +233,15 @@ export const useStore = create<State>()(
             ? s.favoriteExerciseIds.filter((exerciseId) => exerciseId !== id)
             : [...s.favoriteExerciseIds, id],
         })),
+      toggleFavoriteFood: (id) =>
+        set((s) => ({
+          favoriteFoodIds: s.favoriteFoodIds.includes(id)
+            ? s.favoriteFoodIds.filter((foodId) => foodId !== id)
+            : [...s.favoriteFoodIds, id],
+        })),
+      addWorkoutRoutine: (routine) => set((s) => ({ workoutRoutines: [...s.workoutRoutines, routine] })),
+      deleteWorkoutRoutine: (id) => set((s) => ({ workoutRoutines: s.workoutRoutines.filter((routine) => routine.id !== id) })),
+      setCoachFocusItems: (coachFocusItems) => set({ coachFocusItems }),
 
       setWeightLogs: (logs) =>
         set((s) => {
@@ -251,6 +264,8 @@ export const useStore = create<State>()(
           }
           return patch;
         }),
+      deleteWeightLog: (id) =>
+        set((s) => ({ weightLogs: s.weightLogs.filter((log) => log.id !== id) })),
 
       addCustomFood: (f) =>
         set((s) => ({ customFoods: [...s.customFoods, f] })),
@@ -334,6 +349,20 @@ export const useStore = create<State>()(
         }),
 
       leaveSquad: () => set({ squad: null }),
+      applyCloudAppState: (cloud) => set({
+        language: cloud.language ?? "en",
+        recipes: cloud.recipes ?? [],
+        customFoods: cloud.customFoods ?? [],
+        customMenuMeals: cloud.customMenuMeals ?? [],
+        favoriteExerciseIds: cloud.favoriteExerciseIds ?? [],
+        favoriteFoodIds: cloud.favoriteFoodIds ?? [],
+        workoutRoutines: cloud.workoutRoutines ?? [],
+        useDefaultMenu: cloud.useDefaultMenu ?? true,
+        streakDates: cloud.streakDates ?? [],
+        streaks: computeStreaksFromDates(cloud.streakDates ?? []),
+        noMasturbationDates: cloud.noMasturbationDates ?? [],
+        noMasturbationStreaks: computeStreaksFromDates(cloud.noMasturbationDates ?? []),
+      }),
 
       refreshQualifiedStreak: () => {
         const today = todayKey();
@@ -382,6 +411,9 @@ export const useStore = create<State>()(
           customFoods: [],
           customMenuMeals: [],
           favoriteExerciseIds: [],
+          favoriteFoodIds: [],
+          workoutRoutines: [],
+          coachFocusItems: DEFAULT_COACH_FOCUS,
           useDefaultMenu: true,
           dailySummaries: [],
           streaks: emptyStreaks(),

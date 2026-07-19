@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import dynamic from "next/dynamic";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { computeDay, dateKey, dateKeyFromDateTime, normalizeGoal } from "@/lib/types";
@@ -152,10 +152,10 @@ export default function StatsPage() {
   const paceMessage = getPaceMessage(goal, weeklyPace, latestWeightPoint);
 
   return (
-    <div className="space-y-5">
+    <div className="min-w-0 space-y-5">
       <div>
         <div className="flex items-start justify-between gap-3">
-          <div>
+          <div className="min-w-0">
             <h1 className="font-heading text-3xl font-extrabold">Stats</h1>
             <p className="text-sm font-medium text-muted-foreground">
               Deficit, check-ins, water, and sleep history
@@ -169,15 +169,19 @@ export default function StatsPage() {
       </div>
 
       {/* deficit overlay */}
-      <Card className="premium-panel chart-grid rounded-[1.6rem]">
+      <Card className="premium-panel chart-grid min-w-0 overflow-hidden rounded-[1.6rem]">
         <CardHeader>
           <CardTitle className="font-heading flex items-center gap-2 text-base">
             <TrendingDown className="size-4 text-[var(--rosso-light)]" />
             Deficit / calories history
           </CardTitle>
         </CardHeader>
-        <CardContent className="py-2">
+        <CardContent className="min-w-0 overflow-hidden py-2">
           <DeficitChart data={deficitData} />
+          <details className="mt-3 rounded-2xl border border-white/7 p-3 text-xs">
+            <summary className="cursor-pointer font-semibold text-muted-foreground">View calorie history as a table</summary>
+            <div className="mt-3 overflow-x-auto"><table className="w-full text-left"><thead><tr className="text-muted-foreground"><th className="py-1 pr-3">Date</th><th className="pr-3">Eaten</th><th className="pr-3">Workout</th><th>Estimated balance</th></tr></thead><tbody>{deficitData.map((row) => <tr key={row.date} className="border-t border-white/5"><td className="py-1 pr-3">{row.label}</td><td className="pr-3">{row.kcal_in}</td><td className="pr-3">{row.kcal_burned}</td><td>{row.real_deficit}</td></tr>)}</tbody></table></div>
+          </details>
           <div className="mt-3 flex flex-wrap gap-4 text-xs">
             <Legend color="var(--rosso)" label="Calories eaten (bar)" />
             <Legend color="var(--aqua)" label="Workout burn (bar)" />
@@ -227,7 +231,13 @@ export default function StatsPage() {
           {loggedWeightData.length === 0 ? (
             <EmptyChart text="Log a check-in to see your trend" />
           ) : (
-            <WeightTrendChart data={weightData} />
+            <>
+              <WeightTrendChart data={weightData} />
+              <details className="mt-3 rounded-2xl border border-white/7 p-3 text-xs">
+                <summary className="cursor-pointer font-semibold text-muted-foreground">View weight history as a table</summary>
+                <div className="mt-3 overflow-x-auto"><table className="w-full text-left"><thead><tr className="text-muted-foreground"><th className="py-1 pr-3">Date</th><th className="pr-3">Weight</th><th>Target</th></tr></thead><tbody>{weightData.map((row) => <tr key={row.date} className="border-t border-white/5"><td className="py-1 pr-3">{row.date}</td><td className="pr-3">{row.weight ?? "–"}</td><td>{row.target_weight?.toFixed(1) ?? "–"}</td></tr>)}</tbody></table></div>
+              </details>
+            </>
           )}
           <div className="mt-3 rounded-2xl border border-white/7 bg-black/25 p-3">
             <div className="mb-1 flex items-center gap-2">
@@ -491,12 +501,31 @@ function RangeMenu({
   value: StatsRange;
   onChange: (value: StatsRange) => void;
 }) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const closeOutside = (event: PointerEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) setOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOutside);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [open]);
+
   return (
-    <details className="relative shrink-0">
-      <summary className="list-none rounded-full border border-white/10 bg-white/[0.045] px-3 py-2 text-xs font-semibold text-[var(--rosso-light)] marker:hidden">
+    <div ref={menuRef} className="relative shrink-0">
+      <button type="button" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((current) => !current)} className="rounded-full border border-white/10 bg-white/[0.045] px-3 py-2 text-xs font-semibold text-[var(--rosso-light)]">
         {RANGE_LABELS[value]}
-      </summary>
-      <div className="absolute right-0 z-30 mt-2 w-36 rounded-2xl border border-white/10 bg-[#111114] p-1.5 shadow-[0_18px_50px_rgba(0,0,0,0.5)]">
+      </button>
+      {open && <div role="menu" className="absolute right-0 z-30 mt-2 w-36 rounded-2xl border border-white/10 bg-[#111114] p-1.5 shadow-[0_18px_50px_rgba(0,0,0,0.5)]">
         {(["week", "month", "year", "all"] as const).map((option) => (
           <button
             key={option}
@@ -507,16 +536,16 @@ function RangeMenu({
                 ? "bg-[var(--rosso)]/12 text-[var(--rosso-light)]"
                 : "text-muted-foreground hover:bg-white/[0.06] hover:text-foreground")
             }
-            onClick={(event) => {
+            onClick={() => {
               onChange(option);
-              event.currentTarget.closest("details")?.removeAttribute("open");
+              setOpen(false);
             }}
           >
             {RANGE_LABELS[option]}
           </button>
         ))}
-      </div>
-    </details>
+      </div>}
+    </div>
   );
 }
 

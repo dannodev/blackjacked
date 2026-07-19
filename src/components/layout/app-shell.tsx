@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, BarChart3, Utensils, Dumbbell, Users, Bell, ClipboardList, CheckCircle2, LogOut, Settings } from "lucide-react";
+import { Home, BarChart3, Utensils, Dumbbell, Users, Bell, ClipboardList, CheckCircle2, Cloud, CloudOff, LoaderCircle, LogOut, Settings } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
 import { Wordmark } from "@/components/brand/wordmark";
@@ -14,9 +14,11 @@ import {
   loadMySquad,
   subscribeToSquad,
   touchMySquadPresence,
+  updateMySquadMemberProfile,
   type SquadSnapshot,
 } from "@/lib/supabase/squad";
 import { toast } from "sonner";
+import { getCloudSyncState, subscribeCloudSyncState } from "@/lib/cloud-sync";
 
 const nav = [
   { href: "/dashboard", label: "Today", icon: Home },
@@ -26,6 +28,7 @@ const nav = [
   { href: "/squad", label: "Squad", icon: Users },
   { href: "/workouts", label: "Workouts", icon: Dumbbell },
 ];
+const mobileNav = nav.filter((item) => !["/log", "/squad"].includes(item.href));
 
 function initials(name: string) {
   return name.slice(0, 2).toUpperCase();
@@ -45,6 +48,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [squadSnapshot, setSquadSnapshot] = useState<SquadSnapshot | null>(null);
   const [messageSenderIds, setMessageSenderIds] = useState<string[]>([]);
+  const syncState = useSyncExternalStore(subscribeCloudSyncState, getCloudSyncState, () => "idle");
   const notificationsRef = useRef<HTMLDivElement | null>(null);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const initializedSquadRef = useRef(false);
@@ -180,8 +184,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       if (
         event?.table === "squads" ||
-        (event?.table === "squad_members" &&
-          ["INSERT", "DELETE"].includes(event.eventType))
+        event?.table === "squad_members"
       ) {
         shouldReloadSnapshot = true;
       }
@@ -216,14 +219,43 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     };
   }, [pathname, squadSnapshot?.squad.id]);
 
+  useEffect(() => {
+    if (!squadSnapshot?.squad.id || !user?.id) return;
+    updateMySquadMemberProfile(
+      squadSnapshot.squad.id,
+      user.name || user.email?.split("@")[0] || "Racer",
+      profile?.avatar_url ?? null,
+    ).catch(() => undefined);
+  }, [profile?.avatar_url, squadSnapshot?.squad.id, user?.email, user?.id, user?.name]);
+
   return (
-    <div className="app-glow mx-auto flex min-h-[100dvh] max-w-md flex-col overflow-hidden bg-background pt-[env(safe-area-inset-top)] shadow-[0_0_80px_rgba(0,0,0,0.55)] sm:border-x sm:border-white/8">
+    <div className="app-glow mx-auto flex min-h-[100dvh] max-w-7xl overflow-hidden bg-background pt-[env(safe-area-inset-top)] shadow-[0_0_80px_rgba(0,0,0,0.55)] sm:border-x sm:border-white/8">
+      <aside className="hidden w-56 shrink-0 flex-col border-r border-white/7 px-4 py-5 md:flex">
+        <Wordmark size="text-xl" />
+        <nav className="mt-8 space-y-1" aria-label="Primary navigation">
+          {nav.map(({ href, label, icon: Icon }) => {
+            const active = pathname === href || pathname.startsWith(`${href}/`);
+            return <Link key={href} href={href} className={cn(
+              "flex min-h-11 items-center gap-3 rounded-2xl px-3 text-sm font-semibold transition-colors",
+              active ? "bg-[var(--rosso)] text-white" : "text-muted-foreground hover:bg-white/[0.06] hover:text-white",
+            )}><Icon className="size-4" />{t(language, label)}</Link>;
+          })}
+        </nav>
+        <Link href="/profile" className="mt-auto flex min-h-11 items-center gap-3 rounded-2xl px-3 text-sm font-semibold text-muted-foreground hover:bg-white/[0.06] hover:text-white">
+          <Settings className="size-4" />{t(language, "My profile")}
+        </Link>
+      </aside>
+      <div className="flex min-w-0 flex-1 flex-col">
       {/* Sticky app bar */}
       <header className="sticky top-0 z-40 flex items-center justify-between border-b border-white/5 bg-background/94 px-4 py-3 md:bg-background/72 md:backdrop-blur-2xl">
         <Link href="/dashboard" className="flex items-center">
           <Wordmark size="text-lg" />
         </Link>
         <div className="flex items-center gap-2">
+          {syncState !== "idle" && <div className="hidden items-center gap-1 rounded-full border border-white/8 px-2 py-1 text-[10px] text-muted-foreground sm:flex" role="status">
+            {syncState === "syncing" ? <LoaderCircle className="size-3 animate-spin" /> : syncState === "offline" ? <CloudOff className="size-3" /> : <Cloud className="size-3 text-[var(--amber)]" />}
+            {syncState === "syncing" ? "Syncing" : syncState === "offline" ? "Offline · queued" : "Sync retrying"}
+          </div>}
           <button
             type="button"
             aria-label={t(language, "Language")}
@@ -334,12 +366,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </header>
 
       {/* Page content */}
-      <main className="flex-1 px-4 pb-28 pt-4">{children}</main>
+      <main className="min-w-0 flex-1 overflow-x-hidden px-4 pb-28 pt-4 md:px-8 md:pb-10 lg:px-10">{children}</main>
 
       {/* Bottom nav */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto max-w-md px-3 pb-3">
+      <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto max-w-md px-3 pb-3 md:hidden">
         <ul className="flex items-stretch justify-around rounded-[1.6rem] border border-white/8 bg-black/94 px-1 pb-[env(safe-area-inset-bottom)] shadow-[0_18px_50px_rgba(0,0,0,0.5)] md:bg-black/72 md:backdrop-blur-2xl">
-          {nav.map(({ href, label, icon: Icon }) => {
+          {mobileNav.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(`${href}/`);
             return (
               <li key={href} className="flex-1">
@@ -365,6 +397,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           })}
         </ul>
       </nav>
+      </div>
     </div>
   );
 }
@@ -401,14 +434,14 @@ function buildNotifications(
     items.push({
       title: t(language, "Hydration check"),
       description: `${(waterMl / 1000).toFixed(1)}L ${language === "es" ? "registrados hoy. Agrega agua desde Hoy." : "logged today. Add water from Today."}`,
-      href: "/dashboard",
+      href: "/dashboard#hydration",
     });
   }
   if (sleepHours === 0) {
     items.push({
       title: t(language, "Add sleep"),
       description: t(language, "Log last night's sleep so Stats can build your trend."),
-      href: "/dashboard",
+      href: "/dashboard#sleep",
     });
   }
   return items.slice(0, 3);

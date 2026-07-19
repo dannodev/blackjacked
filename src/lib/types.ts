@@ -142,8 +142,17 @@ export interface ExerciseLog {
   distance_km?: number;
   reps?: number;
   sets?: number;
+  load_kg?: number;
+  rpe?: number;
   kcal_burned: number;
   loggedAt: string;
+}
+
+export interface WorkoutRoutine {
+  id: string;
+  name: string;
+  exercise_ids: string[];
+  createdAt: string;
 }
 
 export interface WeightLog {
@@ -154,6 +163,7 @@ export interface WeightLog {
   hip_cm?: number;
   arm_cm?: number;
   photo_url?: string;
+  photo_public_id?: string;
   loggedAt: string;
 }
 
@@ -183,6 +193,10 @@ export interface Recipe {
   instructions: string;
   is_template: boolean;
   ingredients: { food_item_id: string; name: string; qty: number; unit: string }[];
+  kcal_per_serving?: number;
+  protein_per_serving?: number;
+  fat_per_serving?: number;
+  carb_per_serving?: number;
   createdAt: string;
 }
 
@@ -206,6 +220,16 @@ export function mifflinBMR(
 
 export function computeTDEE(bmr: number, activity_factor: number): number {
   return bmr * activity_factor;
+}
+
+export function recommendedCalorieTarget(
+  tdee: number,
+  mode: GoalMode,
+  sex: Sex,
+): number {
+  const adjustment = mode === "lose" ? -350 : mode === "gain" ? 250 : 0;
+  const minimum = sex === "male" ? 1500 : 1200;
+  return Math.max(minimum, Math.round((tdee + adjustment) / 10) * 10);
 }
 
 export function adlKcal(tdee: number, bmr: number): number {
@@ -260,7 +284,9 @@ export function computeDay(
     profile.current_weight_kg,
   );
   const tdee_kcal = computeTDEE(bmr_kcal, profile.activity_factor);
-  const total_out = tdee_kcal + kcal_out_activity;
+  // The selected activity factor already includes habitual exercise. Logged
+  // workouts are an adherence metric and must not be counted a second time.
+  const total_out = tdee_kcal;
   const goal_deficit = profile.calorie_goal - kcal_in;
   const real_deficit = total_out - kcal_in;
   const remaining_vs_goal = goal_deficit;

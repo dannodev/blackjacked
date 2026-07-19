@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useStore } from "@/lib/store";
@@ -32,9 +32,10 @@ const CATEGORIES: (ExerciseCategory | "all")[] = [
   "daily",
 ];
 
-export function ExerciseLogForm() {
+export function ExerciseLogForm({ initialExerciseId }: { initialExerciseId?: string }) {
   const profile = useStore((s) => s.profile)!;
   const favoriteExerciseIds = useStore((s) => s.favoriteExerciseIds);
+  const exerciseLogs = useStore((s) => s.exerciseLogs);
   const toggleFavoriteExercise = useStore((s) => s.toggleFavoriteExercise);
   const { addExerciseLog } = useCloudExerciseLogs();
   const [cat, setCat] = useState<ExerciseCategory | "all">("all");
@@ -44,6 +45,8 @@ export function ExerciseLogForm() {
   const [distance, setDistance] = useState(0);
   const [sets, setSets] = useState(3);
   const [reps, setReps] = useState(10);
+  const [loadKg, setLoadKg] = useState(0);
+  const [rpe, setRpe] = useState(7);
   const [aiQuery, setAiQuery] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
 
@@ -64,10 +67,23 @@ export function ExerciseLogForm() {
     .map((id) => EXERCISES.find((exercise) => exercise.id === id))
     .filter((exercise): exercise is Exercise => Boolean(exercise));
 
-  function chooseExercise(exercise: Exercise) {
+  const chooseExercise = useCallback((exercise: Exercise) => {
     setSelected(exercise);
     setDuration(exercise.fixed_kcal_per_25_min ? 25 : 30);
-  }
+    const previous = [...exerciseLogs]
+      .filter((log) => log.exercise_id === exercise.id)
+      .sort((a, b) => +new Date(b.loggedAt) - +new Date(a.loggedAt))[0];
+    if (previous?.sets) setSets(previous.sets);
+    if (previous?.reps) setReps(previous.reps);
+    setLoadKg(previous?.load_kg ?? 0);
+    setRpe(previous?.rpe ?? 7);
+  }, [exerciseLogs]);
+
+  useEffect(() => {
+    if (!initialExerciseId) return;
+    const exercise = EXERCISES.find((item) => item.id === initialExerciseId);
+    if (exercise) chooseExercise(exercise);
+  }, [chooseExercise, initialExerciseId]);
 
   async function log() {
     if (!selected) {
@@ -88,6 +104,8 @@ export function ExerciseLogForm() {
       distance_km: selected.distance_based ? distance || undefined : undefined,
       reps: !isTimedOnly && (selected.category === "gym" || selected.category === "core" || selected.category === "calisthenics") ? reps : undefined,
       sets: !isTimedOnly && (selected.category === "gym" || selected.category === "core" || selected.category === "calisthenics") ? sets : undefined,
+      load_kg: !isTimedOnly && selected.category === "gym" && loadKg > 0 ? loadKg : undefined,
+      rpe: !isTimedOnly && ["gym", "core", "calisthenics"].includes(selected.category) ? rpe : undefined,
       kcal_burned: kcal,
       loggedAt: new Date().toISOString(),
     };
@@ -244,8 +262,25 @@ export function ExerciseLogForm() {
                       onChange={(e) => setReps(+e.target.value)}
                     />
                   </Field>
+                  {selected.category === "gym" && <Field label="Load (kg)">
+                    <Input type="number" min="0" step="0.5" value={loadKg || ""} placeholder="Bodyweight" onChange={(e) => setLoadKg(+e.target.value)} />
+                  </Field>}
+                  <Field label="Effort (RPE 1–10)">
+                    <Input type="number" min="1" max="10" step="0.5" value={rpe} onChange={(e) => setRpe(Math.max(1, Math.min(10, +e.target.value)))} />
+                  </Field>
                 </div>
               )}
+              {selected && (() => {
+                const previous = [...exerciseLogs].filter((item) => item.exercise_id === selected.id).sort((a, b) => +new Date(b.loggedAt) - +new Date(a.loggedAt))[0];
+                if (!previous) return null;
+                const suggestion = previous.load_kg && (previous.rpe ?? 10) <= 8
+                  ? `Try ${(previous.load_kg + 2.5).toFixed(1)} kg if form stays strong.`
+                  : "Match your previous performance with clean form.";
+                return <div className="rounded-2xl border border-[var(--aqua)]/20 bg-[var(--aqua)]/8 p-3 text-xs">
+                  <p className="font-bold text-[var(--aqua)]">Last time: {previous.sets ?? "–"}×{previous.reps ?? "–"}{previous.load_kg ? ` at ${previous.load_kg} kg` : ""}</p>
+                  <p className="mt-1 text-muted-foreground">{suggestion}</p>
+                </div>;
+              })()}
               <Field label="Duration (min)">
                 <Input
                   type="number"

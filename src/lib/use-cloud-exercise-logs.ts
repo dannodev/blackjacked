@@ -4,10 +4,8 @@ import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
 import type { ExerciseLog } from "@/lib/types";
-import {
-  deleteSupabaseExerciseLog,
-  saveSupabaseExerciseLog,
-} from "@/lib/supabase/exercise-logs";
+import { enqueueCloudSyncOperation, flushCloudSyncQueue } from "@/lib/cloud-sync";
+import { trackProductEvent } from "@/lib/product-analytics";
 
 export function useCloudExerciseLogs() {
   const { user } = useAuth();
@@ -16,26 +14,37 @@ export function useCloudExerciseLogs() {
 
   async function addExerciseLog(log: ExerciseLog) {
     addLocalExerciseLog(log);
+    trackProductEvent("workout_logged");
     if (!user) return;
 
-    try {
-      await saveSupabaseExerciseLog(user.id, log);
-    } catch {
+    await enqueueCloudSyncOperation({
+      userId: user.id,
+      kind: "exercise_upsert",
+      recordId: log.id,
+      payload: log,
+    });
+    const synced = await flushCloudSyncQueue(user.id);
+    if (!synced) {
       toast.info("Workout saved locally", {
-        description: "Cloud sync will work again when the connection is healthy.",
+        description: "Queued securely and will retry when the connection returns.",
       });
     }
   }
 
   async function deleteExerciseLog(logId: string) {
     deleteLocalExerciseLog(logId);
+    trackProductEvent("workout_deleted");
     if (!user) return;
 
-    try {
-      await deleteSupabaseExerciseLog(logId);
-    } catch {
+    await enqueueCloudSyncOperation({
+      userId: user.id,
+      kind: "exercise_delete",
+      recordId: logId,
+    });
+    const synced = await flushCloudSyncQueue(user.id);
+    if (!synced) {
       toast.info("Workout removed locally", {
-        description: "Could not remove it from cloud right now.",
+        description: "Deletion is queued and will retry automatically.",
       });
     }
   }

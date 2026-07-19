@@ -12,6 +12,7 @@ import {
   exerciseKcal,
   MEAL_LABELS,
   type Exercise,
+  type ExerciseLog,
   type Meal,
 } from "@/lib/types";
 import {
@@ -34,10 +35,9 @@ import {
   Dumbbell,
   Utensils,
   Trash2,
-  Banana,
 } from "lucide-react";
 import Link from "next/link";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -48,8 +48,10 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { saveSupabaseDailySummary } from "@/lib/supabase/daily-summary";
-import { loadMySquad, type SquadSnapshot } from "@/lib/supabase/squad";
+import { loadMySquad, subscribeToSquad, type SquadSnapshot } from "@/lib/supabase/squad";
 import { t } from "@/lib/i18n";
+import { WeeklyCoachCard } from "@/components/weekly-coach-card";
+import type { CoachFocusId } from "@/lib/supabase/coach-preferences";
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -66,11 +68,13 @@ export default function DashboardPage() {
   const customMenuMeals = useStore((s) => s.customMenuMeals);
   const useDefaultMenu = useStore((s) => s.useDefaultMenu);
   const favoriteExerciseIds = useStore((s) => s.favoriteExerciseIds);
+  const coachFocusItems = useStore((s) => s.coachFocusItems);
   const { addMeal, deleteMeal } = useCloudMeals();
   const { addExerciseLog } = useCloudExerciseLogs();
   const [selectedMenuMeal, setSelectedMenuMeal] = useState<MenuMealOption | null>(null);
   const [confirmNoFapOpen, setConfirmNoFapOpen] = useState(false);
   const [squadSnapshot, setSquadSnapshot] = useState<SquadSnapshot | null>(null);
+  const [calorieDetailsOpen, setCalorieDetailsOpen] = useState(false);
   const { meals, exerciseLogs } = useTodayData();
   const day = computeDay(meals, exerciseLogs, profile);
   const today = dateKey(new Date());
@@ -83,12 +87,22 @@ export default function DashboardPage() {
     ...(useDefaultMenu ? MENU_MEAL_PRESETS : []),
     ...customMenuMeals,
   ];
-  const currentMealOptions = getCurrentMealOptions(
+  const currentMealWindow = getCurrentMealOptions(
     profile.meal_schedule,
     new Date(),
     menuMeals,
     language,
   );
+  const seenMealNames = new Set<string>();
+  const currentMealOptions = {
+    ...currentMealWindow,
+    options: currentMealWindow.options.filter((option) => {
+      const key = option.name.trim().toLowerCase();
+      if (seenMealNames.has(key)) return false;
+      seenMealNames.add(key);
+      return true;
+    }),
+  };
   const loggedMealIds = new Set(
     meals.flatMap((meal) => meal.items.map((item) => item.food_item_id)),
   );
@@ -96,6 +110,9 @@ export default function DashboardPage() {
   const favoriteExercises = favoriteExerciseIds
     .map((id) => EXERCISES.find((exercise) => exercise.id === id))
     .filter((exercise): exercise is Exercise => Boolean(exercise));
+  const visibleCoachFocus = coachFocusItems.filter((item) =>
+    profile.sex === "male" || item !== "no_fap",
+  ).slice(0, 5);
 
   useEffect(() => {
     let cancelled = false;
@@ -110,6 +127,13 @@ export default function DashboardPage() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!squadSnapshot?.squad.id) return;
+    return subscribeToSquad(squadSnapshot.squad.id, () => {
+      loadMySquad().then(setSquadSnapshot).catch(() => undefined);
+    });
+  }, [squadSnapshot?.squad.id]);
 
   async function logMenuMeal(menuMeal: MenuMealOption) {
     await addMeal({
@@ -205,6 +229,7 @@ export default function DashboardPage() {
       <div className="dashboard-item flex items-center justify-between pt-1">
         <div className="flex items-center gap-3">
           <Avatar className="size-12 border border-white/10 bg-[var(--rosso)]/12 shadow-[0_0_26px_rgba(244,63,63,0.12)]">
+            {profile.avatar_url && <AvatarImage src={profile.avatar_url} alt={`${firstName} profile`} />}
             <AvatarFallback className="bg-transparent text-sm font-extrabold text-[var(--rosso-light)]">
               {firstName.slice(0, 2).toUpperCase()}
             </AvatarFallback>
@@ -233,7 +258,7 @@ export default function DashboardPage() {
               className="flex items-center gap-1.5 rounded-full border border-cyan-300/25 bg-cyan-300/10 px-3 py-1.5 text-sm text-cyan-100 disabled:opacity-70"
               aria-label={t(language, "Log no-fap streak day")}
             >
-              <Banana className="size-4" />
+              <span aria-hidden className="text-base leading-none">🍌</span>
               <span className="font-bold">{noMasturbationStreaks.current_streak}</span>
             </button>
           )}
@@ -243,9 +268,9 @@ export default function DashboardPage() {
       <Dialog open={confirmNoFapOpen} onOpenChange={setConfirmNoFapOpen}>
         <DialogContent className="rounded-[1.6rem] border-white/10 bg-[#111]">
           <DialogHeader>
-            <DialogTitle>{t(language, "Did you really not masturbate today?")}</DialogTitle>
+            <DialogTitle>{t(language, "Did you complete the No fap challenge today?")}</DialogTitle>
             <DialogDescription>
-              {t(language, "Be honest. This only counts if you made it through today.")}
+              {t(language, "Be honest. Consistency only works when the check-in is real.")}
             </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-2">
@@ -268,73 +293,52 @@ export default function DashboardPage() {
         </DialogContent>
       </Dialog>
 
-      {/* hero stats card with ring */}
+      {/* personalized today priorities */}
       <div className="dashboard-item">
-        <Card className="premium-panel chart-grid relative overflow-hidden rounded-[2rem]">
+        <Card id="today-priorities" className="premium-panel chart-grid relative scroll-mt-24 overflow-hidden rounded-[2rem]">
           <div className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-[var(--rosso)]/15 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-24 left-10 h-48 w-48 rounded-full bg-[var(--ember)]/10 blur-3xl" />
-          <CardContent className="relative py-5">
-            <div className="flex items-start justify-between">
+          <CardContent className="relative space-y-2 py-5">
+            <div className="mb-3 flex items-start justify-between">
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--rosso-light)]">
-                  Daily balance
+                  Today priorities
                 </p>
-                <h2 className="font-heading text-2xl font-extrabold">Calories</h2>
+                <h2 className="font-heading text-2xl font-extrabold">Your daily focus</h2>
               </div>
-              <div className="flex h-14 w-14 items-center justify-center rounded-full border border-white/10 bg-black/35">
-                <div className="text-center">
-                  <p className="font-heading text-sm font-extrabold leading-none text-white">
-                    {Math.round((day.kcal_in / Math.max(1, profile.calorie_goal)) * 100)}%
-                  </p>
-                  <p className="text-[8px] uppercase text-muted-foreground">Goal</p>
-                </div>
+              <div className="rounded-full border border-white/10 bg-black/35 px-3 py-2 text-center">
+                <p className="font-heading text-sm font-extrabold leading-none text-white">{Math.round((day.kcal_in / Math.max(1, profile.calorie_goal)) * 100)}%</p>
+                <p className="mt-1 text-[8px] uppercase text-muted-foreground">Calories</p>
               </div>
             </div>
-
-            <div className="mt-2 flex justify-center">
-              <DeficitRing
-                remaining={day.remaining_vs_goal}
-                goal={profile.calorie_goal}
-                inToday={day.kcal_in}
-                outActivity={day.kcal_out_activity}
-                tdee={day.tdee_kcal}
-              />
-            </div>
-
-            {/* macro cards */}
-            <div className="mt-5 grid grid-cols-4 gap-2">
-              <MacroPill
-                label="Calories"
-                value={day.kcal_in}
-                unit="kcal"
-                goal={profile.calorie_goal}
-                color="var(--rosso-light)"
-              />
-              <MacroPill
-                label="Protein"
-                value={day.p}
-                unit="g"
-                goal={profile.protein_goal}
-                color="var(--ember)"
-              />
-              <MacroPill
-                label="Carbs"
-                value={day.c}
-                unit="g"
-                goal={profile.carb_goal}
-                color="var(--aqua)"
-              />
-              <MacroPill
-                label="Fat"
-                value={day.f}
-                unit="g"
-                goal={profile.fat_goal}
-                color="var(--violet)"
-              />
-            </div>
+            <TodayPriorityRow emoji="⚡" label="Calories" value={`${Math.round(day.kcal_in).toLocaleString()} / ${profile.calorie_goal.toLocaleString()} kcal`} onClick={() => setCalorieDetailsOpen((open) => !open)} />
+            {visibleCoachFocus.map((focus) => {
+              const row = coachFocusRow(focus, {
+                waterToday,
+                sleepToday,
+                mealCount: meals.length,
+                streak: streaks.current_streak,
+                noFapStreak: noMasturbationStreaks.current_streak,
+                exerciseLogs,
+              });
+              if (!row) return null;
+              return <TodayPriorityRow key={focus} {...row} onClick={focus === "no_fap" ? () => setConfirmNoFapOpen(true) : undefined} />;
+            })}
+            {calorieDetailsOpen && <div id="daily-details" className="mt-4 border-t border-white/8 pt-4">
+              <div className="flex justify-center"><DeficitRing remaining={day.remaining_vs_goal} goal={profile.calorie_goal} inToday={day.kcal_in} outActivity={day.kcal_out_activity} tdee={day.tdee_kcal} /></div>
+              <div className="mt-4 grid grid-cols-4 gap-2">
+                <MacroPill label="Calories" value={day.kcal_in} unit="kcal" goal={profile.calorie_goal} color="var(--rosso-light)" />
+                <MacroPill label="Protein" value={day.p} unit="g" goal={profile.protein_goal} color="var(--ember)" />
+                <MacroPill label="Carbs" value={day.c} unit="g" goal={profile.carb_goal} color="var(--aqua)" />
+                <MacroPill label="Fat" value={day.f} unit="g" goal={profile.fat_goal} color="var(--violet)" />
+              </div>
+              <Link href="/stats" className="mt-3 block text-center text-xs font-semibold text-[var(--rosso-light)]">Open complete trends and history</Link>
+            </div>}
           </CardContent>
         </Card>
       </div>
+
+      <div className="dashboard-item"><WeeklyCoachCard /></div>
 
       {/* current meal options */}
       <div className="dashboard-item">
@@ -492,12 +496,10 @@ export default function DashboardPage() {
                   className="flex w-44 shrink-0 flex-col gap-2 rounded-[1.35rem] border border-white/7 bg-white/[0.045] p-3"
                 >
                   <div className="flex items-center gap-2">
-                    <div
-                      className="flex size-9 shrink-0 items-center justify-center rounded-2xl font-heading text-sm font-bold text-white"
-                      style={{ background: member.color }}
-                    >
-                      {member.display_name.slice(0, 2).toUpperCase()}
-                    </div>
+                    <Avatar className="size-9 shrink-0 rounded-2xl border border-white/10" style={{ background: member.color }}>
+                      {member.avatar_url && <AvatarImage src={member.avatar_url} alt={`${member.display_name} profile`} />}
+                      <AvatarFallback className="rounded-2xl bg-transparent font-heading text-sm font-bold text-white">{member.display_name.slice(0, 2).toUpperCase()}</AvatarFallback>
+                    </Avatar>
                     <div className="min-w-0">
                       <p className="truncate text-sm font-bold">
                         <span
@@ -514,10 +516,7 @@ export default function DashboardPage() {
                         <Flame className="size-3" />
                         {latestActivity?.streak ?? 0} streak
                       </p>
-                      <p className="flex items-center gap-1 text-[11px] text-cyan-200">
-                        <Banana className="size-3" />
-                        {latestActivity?.no_masturbation_streak ?? 0} no-fap
-                      </p>
+                      {profile.sex === "male" && <p className="flex items-center gap-1 text-[11px] text-cyan-200"><span aria-hidden>🍌</span>{latestActivity?.no_masturbation_streak ?? 0} No fap</p>}
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-1.5 text-[10px] text-muted-foreground">
@@ -638,7 +637,7 @@ export default function DashboardPage() {
 
       {/* hydration + sleep */}
       <div className="dashboard-item grid grid-cols-2 gap-3">
-        <Card className="carbon-card rounded-[1.35rem] border-white/7">
+        <Card id="hydration" tabIndex={-1} className="carbon-card scroll-mt-24 rounded-[1.35rem] border-white/7 target:ring-2 target:ring-[var(--aqua)]/60">
           <CardContent className="py-3.5">
             <div className="mb-1.5 flex items-center gap-2">
               <Droplets className="size-4 text-[var(--aqua)]" />
@@ -667,7 +666,7 @@ export default function DashboardPage() {
             </div>
           </CardContent>
         </Card>
-        <Card className="carbon-card rounded-[1.35rem] border-white/7">
+        <Card id="sleep" tabIndex={-1} className="carbon-card scroll-mt-24 rounded-[1.35rem] border-white/7 target:ring-2 target:ring-[var(--violet)]/60">
           <CardContent className="py-3.5">
             <div className="mb-1.5 flex items-center gap-2">
               <Moon className="size-4 text-[var(--violet)]" />
@@ -693,6 +692,48 @@ export default function DashboardPage() {
       </div>
     </div>
   );
+}
+
+type TodayPriority = {
+  emoji: string;
+  label: string;
+  value: string;
+  href?: string;
+  onClick?: () => void;
+};
+
+function TodayPriorityRow({ emoji, label, value, href, onClick }: TodayPriority) {
+  const content = <>
+    <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--rosso)]/10 text-xl" aria-hidden>{emoji}</span>
+    <span className="min-w-0 flex-1 text-left"><span className="block text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{label}</span><span className="block truncate font-heading text-base font-extrabold">{value}</span></span>
+    <span className="text-lg text-[var(--rosso-light)]" aria-hidden>›</span>
+  </>;
+  const className = "flex min-h-14 w-full items-center gap-3 rounded-2xl border border-white/7 bg-black/25 px-3 py-2 transition-colors hover:bg-white/[0.055]";
+  if (href) return <Link href={href} className={className}>{content}</Link>;
+  return <button type="button" onClick={onClick} className={className}>{content}</button>;
+}
+
+function coachFocusRow(
+  focus: CoachFocusId,
+  data: {
+    waterToday: number;
+    sleepToday: number;
+    mealCount: number;
+    streak: number;
+    noFapStreak: number;
+    exerciseLogs: ExerciseLog[];
+  },
+): TodayPriority | null {
+  if (focus === "water") return { emoji: "💦", label: "Water", value: `${(data.waterToday / 1000).toFixed(1)} / 2.0 L`, href: "/dashboard#hydration" };
+  if (focus === "sleep") return { emoji: "🌙", label: "Sleep", value: `${data.sleepToday.toFixed(1)} / 8 hours`, href: "/dashboard#sleep" };
+  if (focus === "meals") return { emoji: "🍎", label: "Meals", value: `${data.mealCount} logged today`, href: "/log" };
+  if (focus === "fitness_streak") return { emoji: "🔥", label: "Fitness streak", value: `${data.streak} day${data.streak === 1 ? "" : "s"}`, href: "/workouts" };
+  if (focus === "no_fap") return { emoji: "🍌", label: "No fap challenge", value: `${data.noFapStreak} day${data.noFapStreak === 1 ? "" : "s"} clean` };
+  const exerciseId = focus.slice("exercise:".length);
+  const exercise = EXERCISES.find((item) => item.id === exerciseId);
+  if (!exercise) return null;
+  const completed = data.exerciseLogs.some((log) => log.exercise_id === exerciseId);
+  return { emoji: "🏃", label: exercise.name, value: completed ? "Done today" : "Not logged yet", href: `/workouts?exercise=${encodeURIComponent(exerciseId)}` };
 }
 
 function MacroPill({

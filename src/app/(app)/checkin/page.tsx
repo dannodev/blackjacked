@@ -7,7 +7,7 @@ import { useStore } from "@/lib/store";
 import { makeId } from "@/lib/id";
 import type { WeightLog } from "@/lib/types";
 import { useAuth } from "@/lib/auth";
-import { saveSupabaseWeightLog } from "@/lib/supabase/weight-logs";
+import { deleteSupabaseWeightLog, saveSupabaseWeightLog } from "@/lib/supabase/weight-logs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,12 +17,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Camera, Scale } from "lucide-react";
+import { Camera, Scale, Trash2 } from "lucide-react";
+import { trackProductEvent } from "@/lib/product-analytics";
 
 export default function CheckInPage() {
   const { user } = useAuth();
   const profile = useStore((s) => s.profile)!;
   const addWeightLog = useStore((s) => s.addWeightLog);
+  const deleteWeightLog = useStore((s) => s.deleteWeightLog);
+  const weightLogs = useStore((s) => s.weightLogs);
 
   const [weight, setWeight] = useState(profile.current_weight_kg);
   const [waist, setWaist] = useState<number | "">("");
@@ -57,10 +60,13 @@ export default function CheckInPage() {
 
     setSaving(true);
     let uploadedPhotoUrl = photoUrl;
+    let uploadedPhotoId: string | undefined;
 
     if (photoBlob) {
       try {
-        uploadedPhotoUrl = await uploadCloudPhoto(photoBlob);
+        const uploaded = await uploadCloudPhoto(photoBlob);
+        uploadedPhotoUrl = uploaded.url;
+        uploadedPhotoId = uploaded.publicId;
       } catch (error) {
         toast.info("Cloud photo upload skipped", {
           description:
@@ -77,18 +83,20 @@ export default function CheckInPage() {
       hip_cm: typeof hip === "number" ? hip : undefined,
       arm_cm: typeof arm === "number" ? arm : undefined,
       photo_url: uploadedPhotoUrl,
+      photo_public_id: uploadedPhotoId,
       loggedAt: new Date().toISOString(),
     };
 
     try {
-      const canCloudSyncPhoto =
-        uploadedPhotoUrl?.startsWith("https://res.cloudinary.com") ?? false;
+      const canCloudSyncPhoto = Boolean(uploadedPhotoId);
       const remoteLog: WeightLog = {
         ...log,
-        photo_url: canCloudSyncPhoto ? uploadedPhotoUrl : undefined,
+        photo_url: undefined,
+        photo_public_id: uploadedPhotoId,
       };
       if (user) await saveSupabaseWeightLog(user.id, remoteLog);
       addWeightLog(log);
+      trackProductEvent("checkin_saved");
       toast.success("Check-in saved", {
         description: canCloudSyncPhoto
           ? `${weight} kg logged with cloud photo`
@@ -104,6 +112,23 @@ export default function CheckInPage() {
       toast.error(error instanceof Error ? error.message : "Could not save check-in");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function removeCheckIn(log: WeightLog) {
+    try {
+      if (log.photo_public_id) {
+        const response = await fetch(
+          `/api/checkin-photo?path=${encodeURIComponent(log.photo_public_id)}`,
+          { method: "DELETE" },
+        );
+        if (!response.ok) throw new Error("Could not remove the private photo.");
+      }
+      if (user) await deleteSupabaseWeightLog(log.id);
+      deleteWeightLog(log.id);
+      toast.success("Check-in deleted");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not delete check-in");
     }
   }
 
@@ -186,8 +211,8 @@ export default function CheckInPage() {
           <div className="space-y-2">
             <Label className="text-xs">Progress photo (optional)</Label>
             <p className="text-xs text-muted-foreground">
-              Photos are compressed, uploaded to Cloudinary when configured,
-              and only the private URL is stored with your check-in.
+              Photos are compressed and stored privately. Access links expire
+              automatically and are renewed only for your signed-in account.
             </p>
             <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-white/15 bg-white/[0.035] px-4 py-6 text-sm text-muted-foreground transition-colors hover:border-[var(--rosso)]/40">
               <Camera className="size-5" />
@@ -215,6 +240,32 @@ export default function CheckInPage() {
           </Button>
         </CardContent>
       </Card>
+
+      <section className="space-y-2" aria-labelledby="recent-checkins">
+        <h2 id="recent-checkins" className="font-heading text-sm font-bold">Recent check-ins</h2>
+        {[...weightLogs].reverse().slice(0, 8).map((log) => (
+          <Card key={log.id} className="rounded-[1.35rem] border-white/7">
+            <CardContent className="flex items-center justify-between gap-3 py-3.5">
+              <div>
+                <p className="font-heading font-bold">{log.weight_kg.toFixed(1)} kg</p>
+                <p className="text-xs text-muted-foreground">
+                  {new Date(log.loggedAt).toLocaleDateString()}
+                  {log.photo_public_id ? " · Private photo" : ""}
+                </p>
+              </div>
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                aria-label={`Delete check-in from ${new Date(log.loggedAt).toLocaleDateString()}`}
+                onClick={() => void removeCheckIn(log)}
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            </CardContent>
+          </Card>
+        ))}
+      </section>
     </div>
   );
 }
@@ -261,7 +312,7 @@ async function loadImage(file: File): Promise<HTMLImageElement> {
   }
 }
 
-async function uploadCloudPhoto(blob: Blob): Promise<string> {
+async function uploadCloudPhoto(blob: Blob): Promise<{ url: string; publicId: string }> {
   const formData = new FormData();
   formData.append("file", blob, `checkin-${Date.now()}.jpg`);
 
@@ -269,11 +320,11 @@ async function uploadCloudPhoto(blob: Blob): Promise<string> {
     method: "POST",
     body: formData,
   });
-  const result = (await response.json()) as { url?: string; error?: string };
+  const result = (await response.json()) as { url?: string; publicId?: string; error?: string };
 
-  if (!response.ok || !result.url) {
-    throw new Error(result.error ?? "Cloudinary is not configured yet.");
+  if (!response.ok || !result.url || !result.publicId) {
+    throw new Error(result.error ?? "Private photo storage is unavailable.");
   }
 
-  return result.url;
+  return { url: result.url, publicId: result.publicId };
 }

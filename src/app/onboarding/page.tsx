@@ -16,6 +16,7 @@ import {
   ageFromBirthdate,
   computeTDEE,
   dateKey,
+  recommendedCalorieTarget,
 } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,7 +33,10 @@ import { cn } from "@/lib/utils";
 
 const basicsSchema = z.object({
   sex: z.enum(["male", "female"]),
-  birthdate: z.string().min(1, "Required"),
+  birthdate: z.string().min(1, "Required").refine(
+    (value) => ageFromBirthdate(value) >= 18,
+    "Blackjacked currently supports adults age 18 and over.",
+  ),
   height_cm: z.coerce.number().min(120).max(230),
   current_weight_kg: z.coerce.number().min(35).max(300),
 });
@@ -40,7 +44,7 @@ type Basics = z.infer<typeof basicsSchema>;
 
 const goalSchema = z.object({
   activity_factor: z.coerce.number(),
-  calorie_goal: z.coerce.number().min(800).max(6000),
+  calorie_goal: z.coerce.number().min(1200).max(6000),
   protein_goal: z.coerce.number().min(0),
   fat_goal: z.coerce.number().min(0),
   carb_goal: z.coerce.number().min(0),
@@ -93,18 +97,22 @@ export default function OnboardingPage() {
       watchBasics.current_weight_kg,
     );
     const tdee = computeTDEE(bmr, (watchActivity as ActivityFactor) || 1.55);
-    const goalCal = Math.round((tdee - 450) / 10) * 10;
+    const goalCal = recommendedCalorieTarget(
+      tdee,
+      watchGoalMode || "lose",
+      watchBasics.sex as Sex,
+    );
     const protein = Math.round(watchBasics.current_weight_kg * 1.6);
     const fat = Math.round((goalCal * 0.25) / 9);
     const carb = Math.round((goalCal - protein * 4 - fat * 9) / 4);
-    return { goalCal: Math.max(1200, goalCal), protein, fat, carb, tdee };
-  }, [watchBasics, watchActivity]);
+    return { goalCal, protein, fat, carb, tdee };
+  }, [watchBasics, watchActivity, watchGoalMode]);
 
   // Live-recalculate macros when the user edits the calorie goal on the goal step
   useEffect(() => {
     if (step !== 2) return;
     const cals = Number(watchCalorieGoal);
-    if (!cals || cals < 800) return;
+    if (!cals || cals < 1200) return;
     // protein: at least 1.6g/kg body weight, or 30% of cals — whichever is higher
     const minProtein = watchBasics?.current_weight_kg
       ? Math.round(watchBasics.current_weight_kg * 1.6)

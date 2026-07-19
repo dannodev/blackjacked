@@ -62,7 +62,7 @@ export default function LoginPage() {
       <CardHeader>
         <CardTitle className="font-heading">{t(language, "Log in")}</CardTitle>
         <CardDescription>
-          {t(language, "Wilis chaparro me la pelas.")}
+          {t(language, "Train with purpose. Track what matters. Keep moving forward.")}
         </CardDescription>
       </CardHeader>
       <form noValidate onSubmit={handleSubmit(onSubmit)}>
@@ -86,7 +86,12 @@ export default function LoginPage() {
             )}
           </div>
           <div className="space-y-2">
-            <Label htmlFor="password">{t(language, "Password")}</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password">{t(language, "Password")}</Label>
+              <Link href="/forgot-password" className="text-xs text-[var(--rosso-light)] hover:underline">
+                {t(language, "Forgot password?")}
+              </Link>
+            </div>
             <div className="relative">
               <Input
                 id="password"

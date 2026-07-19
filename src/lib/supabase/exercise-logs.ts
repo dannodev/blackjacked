@@ -18,6 +18,8 @@ type ExerciseLogRow = {
   distance_km: number | null;
   reps: number | null;
   sets: number | null;
+  load_kg: number | null;
+  rpe: number | null;
   kcal_burned: number;
   logged_at: string;
 };
@@ -37,6 +39,8 @@ function fromRow(row: ExerciseLogRow): ExerciseLog {
     distance_km: row.distance_km ?? undefined,
     reps: row.reps ?? undefined,
     sets: row.sets ?? undefined,
+    load_kg: row.load_kg ?? undefined,
+    rpe: row.rpe ?? undefined,
     kcal_burned: row.kcal_burned,
     loggedAt: row.logged_at,
   };
@@ -54,6 +58,8 @@ function toRow(userId: string, log: ExerciseLog) {
     distance_km: log.distance_km ?? null,
     reps: log.reps ?? null,
     sets: log.sets ?? null,
+    load_kg: log.load_kg ?? null,
+    rpe: log.rpe ?? null,
     kcal_burned: log.kcal_burned,
     logged_at: log.loggedAt,
   };
@@ -68,7 +74,7 @@ export async function loadSupabaseExerciseLogs(
   const { data, error } = await supabase
     .from("exercise_logs")
     .select(
-      "id, user_id, exercise_id, exercise_name, category, mets, duration_min, distance_km, reps, sets, kcal_burned, logged_at",
+      "id, user_id, exercise_id, exercise_name, category, mets, duration_min, distance_km, reps, sets, load_kg, rpe, kcal_burned, logged_at",
     )
     .eq("user_id", userId)
     .order("logged_at", { ascending: false })

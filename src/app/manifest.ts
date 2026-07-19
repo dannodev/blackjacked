@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "BlackJacked",
     short_name: "BlackJacked",
-    description: "Burn the deficit. Track every kcal in and out.",
+    description: "Adaptive nutrition, training, progress, and small-squad accountability.",
     start_url: "/",
     scope: "/",
     display: "standalone",

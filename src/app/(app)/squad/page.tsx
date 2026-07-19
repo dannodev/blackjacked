@@ -3,21 +3,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type React from "react";
 import {
-  Banana,
+  ShieldCheck,
   Copy,
   Crown,
   Dumbbell,
   Flame,
+  Flag,
   Loader2,
   LogOut,
   MessageCircle,
   Pencil,
   Plus,
   Send,
-  ShieldCheck,
   Target,
   Utensils,
   Users,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
@@ -29,6 +31,7 @@ import {
   leaveRemoteSquad,
   loadMySquad,
   sendSquadMessage,
+  reportSquadMessage,
   subscribeToSquad,
   syncMySquadActivity,
   touchMySquadPresence,
@@ -78,7 +81,12 @@ export default function SquadPage() {
   const [editingName, setEditingName] = useState(false);
   const [squadNameDraft, setSquadNameDraft] = useState("");
   const [confirmLeaveOpen, setConfirmLeaveOpen] = useState(false);
+  const [chatMuted, setChatMuted] = useState(false);
   const messagesListRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    setChatMuted(localStorage.getItem("blackjacked.squadChatMuted") === "true");
+  }, []);
 
   const today = todayKey();
   const displayName = user?.name || user?.email?.split("@")[0] || "Racer";
@@ -88,10 +96,9 @@ export default function SquadPage() {
     const todayExercises = exerciseLogs.filter((log) => sameDay(log.loggedAt, today));
     const day = computeDay(todayMeals, todayExercises, profile);
     const goal = normalizeGoal(profile);
-    const publicNoMasturbationStreaks =
-      profile.sex === "male"
-        ? noMasturbationStreaks
-        : { current_streak: 0, longest_streak: 0, last_logged_date: null };
+    const publicNoMasturbationStreaks = profile.sex === "male"
+      ? noMasturbationStreaks
+      : undefined;
     const calorieTargetMet =
       goal.mode === "gain"
         ? day.kcal_in >= profile.calorie_goal
@@ -110,7 +117,7 @@ export default function SquadPage() {
       workoutsCount: todayExercises.length,
       streaks,
       noMasturbationStreaks: publicNoMasturbationStreaks,
-      noMasturbationLoggedToday: publicNoMasturbationStreaks.last_logged_date === today,
+      noMasturbationLoggedToday: publicNoMasturbationStreaks?.last_logged_date === today,
       goalMode: goal.mode,
       goalProgressPct: goal.progress,
       goalDeltaKg: goal.currentDelta,
@@ -304,12 +311,13 @@ export default function SquadPage() {
 
   const handleLeave = async () => {
     if (!snapshot) return;
+    const isOwner = snapshot.squad.owner_id === user?.id;
 
     setBusy(true);
     try {
       await leaveRemoteSquad(snapshot.squad.id);
       setSnapshot(null);
-      toast.success("Left squad");
+      toast.success(isOwner ? "Squad deleted" : "Left squad");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not leave squad");
     } finally {
@@ -384,7 +392,7 @@ export default function SquadPage() {
                 <Users className="size-7" />
               </div>
               <div>
-                <p className="font-heading text-lg font-bold">Start the beef</p>
+                <p className="font-heading text-lg font-bold">Build accountability</p>
                 <p className="text-sm text-muted-foreground">
                   Create a squad and share the invite code with up to 5 friends.
                 </p>
@@ -483,7 +491,7 @@ export default function SquadPage() {
             />
           )}
         </div>
-        {!editingName && (
+        {!editingName && snapshot.squad.owner_id === user?.id && (
           <Button
             variant="outline"
             size="sm"
@@ -506,7 +514,7 @@ export default function SquadPage() {
           className="mt-1 shrink-0"
         >
           <LogOut className="mr-1 size-4" />
-          Leave
+          {snapshot.squad.owner_id === user?.id ? "Delete" : "Leave"}
         </Button>
       </div>
 
@@ -515,9 +523,13 @@ export default function SquadPage() {
           <Card className="w-full max-w-sm rounded-[1.6rem] border-white/10 bg-[#101013]">
             <CardContent className="space-y-4 p-5">
               <div>
-                <p className="font-heading text-lg font-bold">Leave squad?</p>
+                <p className="font-heading text-lg font-bold">
+                  {snapshot.squad.owner_id === user?.id ? "Delete squad?" : "Leave squad?"}
+                </p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  You will stop syncing with this squad. You can join again later with the invite code.
+                  {snapshot.squad.owner_id === user?.id
+                    ? "This permanently deletes the squad, its chat, and its member list for everyone."
+                    : "You will stop syncing with this squad. You can join again later with the invite code."}
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-2">
@@ -536,7 +548,7 @@ export default function SquadPage() {
                     setConfirmLeaveOpen(false);
                   }}
                 >
-                  Leave
+                  {snapshot.squad.owner_id === user?.id ? "Delete" : "Leave"}
                 </Button>
               </div>
             </CardContent>
@@ -544,16 +556,16 @@ export default function SquadPage() {
         </div>
       )}
 
-      <NoFapLeaderboard
+      {profile.sex === "male" && <NoFapLeaderboard
         members={snapshot.members}
         activity={snapshot.activity.filter((item) => item.date === today)}
-      />
+      />}
 
       <div className="space-y-2">
         {members.length === 0 ? (
           <Card className="rounded-[1.5rem] border-dashed border-white/10 bg-white/[0.035]">
             <CardContent className="py-4 text-sm text-muted-foreground">
-              No teammates to show yet. Share the invite code and bring the beef.
+              No teammates yet. Share the invite code with people you trust.
             </CardContent>
           </Card>
         ) : (
@@ -562,6 +574,7 @@ export default function SquadPage() {
               key={member.user_id}
               member={member}
               rank={index + 1}
+              showNoFap={profile.sex === "male"}
             />
           ))
         )}
@@ -569,16 +582,18 @@ export default function SquadPage() {
 
       <Card className="premium-panel rounded-[1.8rem]">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 font-heading text-base">
-            <MessageCircle className="size-4 text-[var(--rosso-light)]" />
-            Squad talk
+          <CardTitle className="flex items-center justify-between gap-2 font-heading text-base">
+            <span className="flex items-center gap-2"><MessageCircle className="size-4 text-[var(--rosso-light)]" />Squad talk</span>
+            <button type="button" aria-label={chatMuted ? "Unmute squad chat" : "Mute squad chat"} className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground" onClick={() => { const next = !chatMuted; setChatMuted(next); localStorage.setItem("blackjacked.squadChatMuted", String(next)); }}>
+              {chatMuted ? <VolumeX className="size-3.5" /> : <Volume2 className="size-3.5" />}{chatMuted ? "Muted" : "Mute"}
+            </button>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div ref={messagesListRef} className="max-h-72 space-y-3 overflow-y-auto pr-1">
+          {!chatMuted && <div ref={messagesListRef} className="max-h-72 space-y-3 overflow-y-auto pr-1">
             {snapshot.messages.length === 0 ? (
               <p className="rounded-2xl border border-white/7 bg-white/[0.03] px-4 py-5 text-center text-sm text-muted-foreground">
-                No messages yet. Be brave. Start the beef.
+                No messages yet. Start with a supportive check-in.
               </p>
             ) : (
               snapshot.messages.map((item) => (
@@ -589,15 +604,19 @@ export default function SquadPage() {
                     (member) => member.user_id === item.user_id,
                   )}
                   isYou={item.user_id === user?.id}
+                  onReport={() => {
+                    if (!snapshot || !window.confirm("Report this message for review?")) return;
+                    void reportSquadMessage(snapshot.squad.id, item.id, "Reported by squad member").then(() => toast.success("Message reported")).catch((error) => toast.error(error instanceof Error ? error.message : "Could not report message"));
+                  }}
                 />
               ))
             )}
-          </div>
-          <div className="flex gap-2">
+          </div>}
+          {chatMuted ? <p className="rounded-2xl bg-white/[0.035] p-4 text-center text-sm text-muted-foreground">Chat is muted on this device. Squad progress remains visible.</p> : <div className="flex gap-2">
             <Input
               value={message}
               maxLength={500}
-              placeholder="Talk your trash..."
+              placeholder="Encourage your squad..."
               onChange={(event) => setMessage(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
@@ -613,7 +632,7 @@ export default function SquadPage() {
             >
               <Send className="size-4" />
             </Button>
-          </div>
+          </div>}
         </CardContent>
       </Card>
 
@@ -790,8 +809,8 @@ function NoFapLeaderboard({
     <Card className="rounded-[1.45rem] border-white/7 bg-white/[0.035]">
       <CardContent className="py-3">
         <p className="mb-2 flex items-center gap-1 text-xs font-bold uppercase text-muted-foreground">
-          <Banana className="size-3 text-cyan-200" />
-          No-fap leaderboard
+          <span aria-hidden className="text-sm">🍌</span>
+          No fap challenge leaderboard
         </p>
         <div className="grid grid-cols-2 gap-2">
           {rows.slice(0, 4).map((row, index) => (
@@ -818,9 +837,11 @@ function NoFapLeaderboard({
 function MemberCard({
   member,
   rank,
+  showNoFap,
 }: {
   member: MemberWithActivity;
   rank: number;
+  showNoFap: boolean;
 }) {
   const activity = member.activity;
   const burned = activity?.kcal_out_activity ?? 0;
@@ -841,15 +862,12 @@ function MemberCard({
       <Card className="carbon-card rounded-[1.6rem] border-white/7">
         <CardContent className="py-4">
           <div className="flex items-center gap-3">
-            <div
-              className="flex size-12 items-center justify-center rounded-2xl font-heading text-lg font-bold text-white"
-              style={{ background: member.color }}
-            >
-              {rank === 1 ? (
-                <Crown className="size-6" />
-              ) : (
-                member.display_name.slice(0, 2).toUpperCase()
-              )}
+            <div className="relative shrink-0">
+              <Avatar className="size-12 rounded-2xl border border-white/10" style={{ background: member.color }}>
+                {member.avatar_url && <AvatarImage src={member.avatar_url} alt={`${member.display_name} profile`} />}
+                <AvatarFallback className="rounded-2xl bg-transparent font-heading text-lg font-bold text-white">{member.display_name.slice(0, 2).toUpperCase()}</AvatarFallback>
+              </Avatar>
+              {rank === 1 && <span className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full bg-[var(--amber)] text-black shadow"><Crown className="size-3" /></span>}
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-2">
@@ -872,13 +890,13 @@ function MemberCard({
                     <Flame className="size-3.5" />
                     <span className="text-xs font-semibold">{streak}</span>
                   </div>
-                  <div className="flex items-center gap-1 text-cyan-200" title="No-fap streak">
-                    <Banana className="size-3.5" />
+                  {showNoFap && <div className="flex items-center gap-1 text-cyan-200" title="No fap challenge streak">
+                    <span aria-hidden>🍌</span>
                     <span className="text-xs font-semibold">{noMasturbationStreak}</span>
-                  </div>
+                  </div>}
                 </div>
               </div>
-              <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+              <div className={`mt-3 grid grid-cols-2 gap-2 text-xs ${showNoFap ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}>
                 <StatPill
                   icon={<Dumbbell className="size-3.5" />}
                   label="Burned"
@@ -889,11 +907,7 @@ function MemberCard({
                   label="Meals"
                   value={`${meals} / ${Math.round(kcalIn)} kcal`}
                 />
-                <StatPill
-                  icon={<Banana className="size-3.5" />}
-                  label="No-fap"
-                  value={`${noMasturbationStreak} now / ${noMasturbationLongestStreak} best`}
-                />
+                {showNoFap && <StatPill icon={<span aria-hidden>🍌</span>} label="No fap challenge" value={`${noMasturbationStreak} now / ${noMasturbationLongestStreak} best`} />}
                 <StatPill
                   icon={<Flame className="size-3.5" />}
                   label="Fit streak"
@@ -988,10 +1002,12 @@ function MessageBubble({
   message,
   member,
   isYou,
+  onReport,
 }: {
   message: SquadMessageRow;
   member?: SquadMemberRow;
   isYou: boolean;
+  onReport: () => void;
 }) {
   const fallback = (member?.display_name ?? "Racer").slice(0, 2).toUpperCase();
   return (
@@ -1021,6 +1037,7 @@ function MessageBubble({
           {member?.display_name ?? "Racer"}
         </p>
         <p className="mt-1 text-sm">{message.body}</p>
+        {!isYou && <button type="button" onClick={onReport} className="mt-2 flex items-center gap-1 text-[10px] opacity-60 hover:opacity-100" aria-label="Report message"><Flag className="size-3" />Report</button>}
       </div>
       {isYou && (
         <Avatar

@@ -21,11 +21,13 @@ import {
   type Profile,
   type Sex,
 } from "@/lib/types";
-import { Bolt, Bell, BellOff, Camera, Clock3, Target, Trash2 } from "lucide-react";
+import { Bolt, Bell, BellOff, Camera, Clock3, Download, LogOut, Target, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { memo, useEffect, useState } from "react";
 import { saveSupabaseProfile } from "@/lib/supabase/profile";
+import Link from "next/link";
+import { trackProductEvent } from "@/lib/product-analytics";
 
 function emptySchedule(): Required<Record<keyof MealSchedule, string>> {
   return {
@@ -124,16 +126,18 @@ async function deleteAvatar() {
 }
 
 export default function ProfilePage() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const profile = useStore((s) => s.profile)!;
   const updateProfile = useStore((s) => s.updateProfile);
   const streaks = useStore((s) => s.streaks);
   const resetAll = useStore((s) => s.resetAll);
   const [remindersOn, setRemindersOn] = useState(false);
+  const [reminderTime, setReminderTime] = useState("19:00");
   const [savingTimes, setSavingTimes] = useState(false);
   const [savingGoal, setSavingGoal] = useState(false);
   const [savingStats, setSavingStats] = useState(false);
   const [savingAvatar, setSavingAvatar] = useState(false);
+  const [managingAccount, setManagingAccount] = useState(false);
   const [editingSection, setEditingSection] = useState<
     "stats" | "goal" | "meals" | null
   >(null);
@@ -142,31 +146,59 @@ export default function ProfilePage() {
   useEffect(() => {
     const stored = localStorage.getItem("blackjacked.reminders");
     setRemindersOn(stored === "true");
+    setReminderTime(localStorage.getItem("blackjacked.reminderTime") ?? "19:00");
   }, []);
 
-  function toggleReminders() {
-    const next = !remindersOn;
-    setRemindersOn(next);
-    localStorage.setItem("blackjacked.reminders", String(next));
-    if (next && "Notification" in window) {
-      Notification.requestPermission().then((p) => {
-        if (p === "granted") {
-          toast.success("Reminders on", {
-            description: "You'll get a daily nudge to log.",
-          });
-        } else {
-          toast.info("Notifications blocked", {
-            description: "Enable in browser settings to get reminders.",
-          });
-          setRemindersOn(false);
-          localStorage.setItem("blackjacked.reminders", "false");
-        }
+  useEffect(() => {
+    if (!remindersOn) return;
+    const timer = window.setTimeout(async () => {
+      const registration = await navigator.serviceWorker.getRegistration();
+      const subscription = await registration?.pushManager.getSubscription();
+      if (!subscription) return;
+      const json = subscription.toJSON();
+      await fetch("/api/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          endpoint: subscription.endpoint,
+          keys: json.keys,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          reminderTime,
+        }),
       });
-    } else if (next) {
-      toast.info("This browser doesn't support notifications");
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [reminderTime, remindersOn]);
+
+  async function toggleReminders() {
+    const next = !remindersOn;
+    try {
+      if (next) {
+        if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) throw new Error("This browser does not support background reminders.");
+        const permission = await Notification.requestPermission();
+        if (permission !== "granted") throw new Error("Notifications are blocked in browser settings.");
+        const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+        if (!publicKey) throw new Error("Push reminders are not configured yet.");
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(publicKey) });
+        const json = subscription.toJSON();
+        const response = await fetch("/api/notifications", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ endpoint: subscription.endpoint, keys: json.keys, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, reminderTime }) });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error ?? "Could not enable reminders.");
+        toast.success("Daily reminder enabled", { description: `Scheduled around ${reminderTime} in your timezone.` });
+      } else {
+        const registration = await navigator.serviceWorker.getRegistration();
+        const subscription = await registration?.pushManager.getSubscription();
+        await subscription?.unsubscribe();
+        await fetch("/api/notifications", { method: "DELETE" });
+        toast.success("Reminders off");
+      }
+      setRemindersOn(next);
+      localStorage.setItem("blackjacked.reminders", String(next));
+    } catch (error) {
       setRemindersOn(false);
-    } else {
-      toast.success("Reminders off");
+      localStorage.setItem("blackjacked.reminders", "false");
+      toast.error(error instanceof Error ? error.message : "Could not change reminders");
     }
   }
 
@@ -260,8 +292,49 @@ export default function ProfilePage() {
 
   function handleReset() {
     resetAll();
-    toast.success("All data reset");
+    toast.success("Local setup cleared", {
+      description: "Your cloud history is unchanged. Complete onboarding to continue.",
+    });
     router.replace("/onboarding");
+  }
+
+  async function exportData() {
+    try {
+      setManagingAccount(true);
+      const response = await fetch("/api/account");
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "Could not export data.");
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `blackjacked-export-${dateKey(new Date())}.json`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      toast.success("Data export downloaded");
+      trackProductEvent("account_exported");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not export data");
+    } finally {
+      setManagingAccount(false);
+    }
+  }
+
+  async function deleteAccount() {
+    if (!window.confirm("Permanently delete your account, logs, squad membership, and photos? This cannot be undone.")) return;
+    if (!window.confirm("Final confirmation: permanently delete everything?")) return;
+    try {
+      setManagingAccount(true);
+      const response = await fetch("/api/account", { method: "DELETE" });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "Could not delete account.");
+      resetAll();
+      await signOut();
+      router.replace("/signup");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not delete account");
+      setManagingAccount(false);
+    }
   }
 
   async function handleAvatarFile(file?: File) {
@@ -408,7 +481,7 @@ export default function ProfilePage() {
 
       <div className="space-y-2">
         <button
-          onClick={toggleReminders}
+          onClick={() => void toggleReminders()}
           aria-label={remindersOn ? "Disable reminders" : "Enable reminders"}
           className="flex w-full items-center justify-between rounded-[1.35rem] border border-white/7 bg-white/[0.045] px-4 py-3"
         >
@@ -431,16 +504,49 @@ export default function ProfilePage() {
             {remindersOn ? "On" : "Off"}
           </span>
         </button>
+        <div className="flex items-center justify-between rounded-[1.35rem] border border-white/7 bg-white/[0.035] px-4 py-3">
+          <Label htmlFor="reminder-time" className="text-sm">Reminder time</Label>
+          <Input id="reminder-time" type="time" value={reminderTime} className="w-32" onChange={(event) => { setReminderTime(event.target.value); localStorage.setItem("blackjacked.reminderTime", event.target.value); }} />
+        </div>
+        <Button
+          variant="outline"
+          className="w-full"
+          disabled={managingAccount}
+          onClick={() => void exportData()}
+        >
+          <Download className="mr-2 size-4" />
+          Export my data
+        </Button>
+        <Button
+          variant="ghost"
+          className="w-full"
+          onClick={handleReset}
+        >
+          <LogOut className="mr-2 size-4" />
+          Restart onboarding locally
+        </Button>
         <Button
           variant="ghost"
           className="w-full text-[var(--over)]"
-          onClick={handleReset}
+          disabled={managingAccount}
+          onClick={() => void deleteAccount()}
         >
-          Reset all data
+          <Trash2 className="mr-2 size-4" />
+          Permanently delete account
         </Button>
+        <div className="flex justify-center gap-4 pt-2 text-xs text-muted-foreground">
+          <Link href="/privacy" className="hover:text-white hover:underline">Privacy</Link>
+          <Link href="/terms" className="hover:text-white hover:underline">Terms</Link>
+        </div>
       </div>
     </div>
   );
+}
+
+function urlBase64ToUint8Array(value: string) {
+  const padding = "=".repeat((4 - (value.length % 4)) % 4);
+  const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
+  return Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
 }
 
 function MealTimeInput({
@@ -546,8 +652,8 @@ function StatsTargetsEditor({
       toast.error("Weight should be between 35 and 300 kg.");
       return;
     }
-    if (draft.calorie_goal < 800 || draft.calorie_goal > 6000) {
-      toast.error("Calories should be between 800 and 6000.");
+    if (draft.calorie_goal < 1200 || draft.calorie_goal > 6000) {
+      toast.error("Calories should be between 1200 and 6000.");
       return;
     }
     void onSave({
