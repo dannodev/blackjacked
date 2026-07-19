@@ -863,9 +863,23 @@ function MemberCard({
         <CardContent className="py-4">
           <div className="flex items-center gap-3">
             <div className="relative shrink-0">
-              <Avatar className="size-12 rounded-2xl border border-white/10" style={{ background: member.color }}>
-                {member.avatar_url && <AvatarImage src={member.avatar_url} alt={`${member.display_name} profile`} />}
-                <AvatarFallback className="rounded-2xl bg-transparent font-heading text-lg font-bold text-white">{member.display_name.slice(0, 2).toUpperCase()}</AvatarFallback>
+              <Avatar
+                key={member.avatar_url ?? `${member.user_id}-fallback`}
+                className="size-12 overflow-hidden rounded-2xl border border-white/10 bg-transparent"
+              >
+                {member.avatar_url && (
+                  <AvatarImage
+                    className="rounded-2xl"
+                    src={member.avatar_url}
+                    alt={`${member.display_name} profile`}
+                  />
+                )}
+                <AvatarFallback
+                  className="rounded-2xl font-heading text-lg font-bold text-white"
+                  style={{ background: member.color }}
+                >
+                  {member.display_name.slice(0, 2).toUpperCase()}
+                </AvatarFallback>
               </Avatar>
               {rank === 1 && <span className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full bg-[var(--amber)] text-black shadow"><Crown className="size-3" /></span>}
             </div>
