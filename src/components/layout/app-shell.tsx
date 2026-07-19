@@ -19,6 +19,7 @@ import {
 } from "@/lib/supabase/squad";
 import { toast } from "sonner";
 import { getCloudSyncState, subscribeCloudSyncState } from "@/lib/cloud-sync";
+import { usePushNotifications } from "@/lib/use-push-notifications";
 
 const nav = [
   { href: "/dashboard", label: "Today", icon: Home },
@@ -70,6 +71,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       ),
     [language, meals.length, messageSenderIds, sleepToday, squadSnapshot?.members, waterToday],
   );
+  const pushNotifications = usePushNotifications();
+
+  async function enableCoachNotifications() {
+    try {
+      const reminderTime = localStorage.getItem("blackjacked.reminderTime") ?? "19:00";
+      await pushNotifications.enable(reminderTime);
+      toast.success("Coach notifications enabled", {
+        description: `Daily reminders are scheduled around ${reminderTime}.`,
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not enable notifications");
+    }
+  }
 
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
@@ -286,6 +300,39 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     {notificationItems.length || t(language, "clear")}
                   </span>
                 </div>
+                {pushNotifications.status !== "enabled" ? (
+                  <div className="mb-2 rounded-2xl border border-[var(--rosso)]/20 bg-[var(--rosso)]/[0.07] p-3">
+                    <p className="text-sm font-bold">
+                      {t(language, pushNotifications.status === "blocked" ? "Notifications blocked" : "Get Coach reminders")}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {t(language, pushNotifications.status === "unsupported"
+                        ? "This browser doesn't support notifications"
+                        : pushNotifications.status === "blocked"
+                          ? "Enable notifications in your browser settings."
+                          : "Receive reminders based on your Coach priorities.")}
+                    </p>
+                    {pushNotifications.status !== "unsupported" && pushNotifications.status !== "blocked" && (
+                      <button
+                        type="button"
+                        disabled={pushNotifications.busy || pushNotifications.status === "loading"}
+                        onClick={() => void enableCoachNotifications()}
+                        className="mt-2 w-full rounded-xl bg-[var(--rosso)] px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
+                      >
+                        {t(language, pushNotifications.busy ? "Enabling…" : "Enable notifications")}
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <Link
+                    href="/profile"
+                    onClick={() => setNotificationsOpen(false)}
+                    className="mb-2 flex items-center justify-between rounded-2xl border border-emerald-400/15 bg-emerald-400/[0.06] p-3 text-xs"
+                  >
+                    <span className="font-bold text-emerald-300">{t(language, "Coach notifications are on")}</span>
+                    <span className="text-muted-foreground">{t(language, "Change time")}</span>
+                  </Link>
+                )}
                 {notificationItems.length === 0 ? (
                   <div className="flex items-center gap-2 rounded-2xl bg-white/[0.04] p-3 text-sm text-muted-foreground">
                     <CheckCircle2 className="size-4 text-[var(--aqua)]" />

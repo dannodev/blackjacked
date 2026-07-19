@@ -28,6 +28,7 @@ import { memo, useEffect, useState } from "react";
 import { saveSupabaseProfile } from "@/lib/supabase/profile";
 import Link from "next/link";
 import { trackProductEvent } from "@/lib/product-analytics";
+import { usePushNotifications } from "@/lib/use-push-notifications";
 
 function emptySchedule(): Required<Record<keyof MealSchedule, string>> {
   return {
@@ -131,7 +132,6 @@ export default function ProfilePage() {
   const updateProfile = useStore((s) => s.updateProfile);
   const streaks = useStore((s) => s.streaks);
   const resetAll = useStore((s) => s.resetAll);
-  const [remindersOn, setRemindersOn] = useState(false);
   const [reminderTime, setReminderTime] = useState("19:00");
   const [savingTimes, setSavingTimes] = useState(false);
   const [savingGoal, setSavingGoal] = useState(false);
@@ -142,62 +142,38 @@ export default function ProfilePage() {
     "stats" | "goal" | "meals" | null
   >(null);
   const router = useRouter();
+  const {
+    status: pushStatus,
+    busy: pushBusy,
+    enable: enablePushNotifications,
+    disable: disablePushNotifications,
+    syncReminderTime,
+  } = usePushNotifications();
+  const remindersOn = pushStatus === "enabled";
 
   useEffect(() => {
-    const stored = localStorage.getItem("blackjacked.reminders");
-    setRemindersOn(stored === "true");
     setReminderTime(localStorage.getItem("blackjacked.reminderTime") ?? "19:00");
   }, []);
 
   useEffect(() => {
     if (!remindersOn) return;
     const timer = window.setTimeout(async () => {
-      const registration = await navigator.serviceWorker.getRegistration();
-      const subscription = await registration?.pushManager.getSubscription();
-      if (!subscription) return;
-      const json = subscription.toJSON();
-      await fetch("/api/notifications", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          endpoint: subscription.endpoint,
-          keys: json.keys,
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          reminderTime,
-        }),
-      });
+      await syncReminderTime(reminderTime).catch(() => undefined);
     }, 700);
     return () => window.clearTimeout(timer);
-  }, [reminderTime, remindersOn]);
+  }, [reminderTime, remindersOn, syncReminderTime]);
 
   async function toggleReminders() {
     const next = !remindersOn;
     try {
       if (next) {
-        if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) throw new Error("This browser does not support background reminders.");
-        const permission = await Notification.requestPermission();
-        if (permission !== "granted") throw new Error("Notifications are blocked in browser settings.");
-        const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-        if (!publicKey) throw new Error("Push reminders are not configured yet.");
-        const registration = await navigator.serviceWorker.ready;
-        const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(publicKey) });
-        const json = subscription.toJSON();
-        const response = await fetch("/api/notifications", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ endpoint: subscription.endpoint, keys: json.keys, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, reminderTime }) });
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error ?? "Could not enable reminders.");
+        await enablePushNotifications(reminderTime);
         toast.success("Daily reminder enabled", { description: `Scheduled around ${reminderTime} in your timezone.` });
       } else {
-        const registration = await navigator.serviceWorker.getRegistration();
-        const subscription = await registration?.pushManager.getSubscription();
-        await subscription?.unsubscribe();
-        await fetch("/api/notifications", { method: "DELETE" });
+        await disablePushNotifications();
         toast.success("Reminders off");
       }
-      setRemindersOn(next);
-      localStorage.setItem("blackjacked.reminders", String(next));
     } catch (error) {
-      setRemindersOn(false);
-      localStorage.setItem("blackjacked.reminders", "false");
       toast.error(error instanceof Error ? error.message : "Could not change reminders");
     }
   }
@@ -482,6 +458,7 @@ export default function ProfilePage() {
       <div className="space-y-2">
         <button
           onClick={() => void toggleReminders()}
+          disabled={pushBusy || pushStatus === "loading"}
           aria-label={remindersOn ? "Disable reminders" : "Enable reminders"}
           className="flex w-full items-center justify-between rounded-[1.35rem] border border-white/7 bg-white/[0.045] px-4 py-3"
         >
@@ -501,7 +478,7 @@ export default function ProfilePage() {
                 : "bg-white/5 text-muted-foreground")
             }
           >
-            {remindersOn ? "On" : "Off"}
+            {pushBusy ? "Saving…" : remindersOn ? "On" : "Off"}
           </span>
         </button>
         <div className="flex items-center justify-between rounded-[1.35rem] border border-white/7 bg-white/[0.035] px-4 py-3">
@@ -541,12 +518,6 @@ export default function ProfilePage() {
       </div>
     </div>
   );
-}
-
-function urlBase64ToUint8Array(value: string) {
-  const padding = "=".repeat((4 - (value.length % 4)) % 4);
-  const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
-  return Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
 }
 
 function MealTimeInput({

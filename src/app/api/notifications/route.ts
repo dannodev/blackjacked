@@ -9,6 +9,10 @@ const subscriptionSchema = z.object({
   reminderTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
 });
 
+const deleteSubscriptionSchema = z.object({
+  endpoint: z.string().url().max(2000),
+});
+
 export async function POST(request: Request) {
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase.auth.getUser();
@@ -30,11 +34,17 @@ export async function POST(request: Request) {
   return NextResponse.json({ ok: true });
 }
 
-export async function DELETE() {
+export async function DELETE(request: Request) {
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase.auth.getUser();
   if (!data.user) return NextResponse.json({ error: "Sign in to disable reminders." }, { status: 401 });
-  const { error } = await supabase.from("push_subscriptions").delete().eq("user_id", data.user.id);
+  const parsed = deleteSubscriptionSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ error: "Invalid push subscription." }, { status: 400 });
+  const { error } = await supabase
+    .from("push_subscriptions")
+    .delete()
+    .eq("user_id", data.user.id)
+    .eq("endpoint", parsed.data.endpoint);
   if (error) return NextResponse.json({ error: "Could not disable reminder." }, { status: 502 });
   return NextResponse.json({ ok: true });
 }
